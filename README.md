@@ -14,13 +14,13 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 ## Installation
 
 ```bash
-npm install yaml-reference-ts
+npm install @dsillman2000/yaml-reference-ts
 ```
 
 Or for global CLI usage:
 
 ```bash
-npm install -g yaml-reference-ts
+npm install -g @dsillman2000/yaml-reference-ts
 ```
 
 ## YAML Syntax Examples
@@ -56,7 +56,7 @@ files: !reference-all {glob: ./data/*.yaml}
 ### Basic Usage
 
 ```typescript
-import { loadAndResolve } from 'yaml-reference-ts';
+import { loadAndResolve } from '@dsillman2000/yaml-reference-ts';
 
 async function loadConfig() {
   try {

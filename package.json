@@ -2,6 +2,14 @@
     "name": "@dsillman2000/yaml-reference-ts",
     "version": "1.0.4",
     "description": "A Node.js TypeScript library for resolving YAML documents containing !reference and !reference-all tags",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/dsillman2000/yaml-reference-ts"
+    },
+    "homepage": "https://github.com/dsillman2000/yaml-reference-ts#readme",
+    "bugs": {
+        "url": "https://github.com/dsillman2000/yaml-reference-ts/issues"
+    },
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "bin": {
