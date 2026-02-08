@@ -1,0 +1,48 @@
+{
+    "name": "yaml-reference-ts",
+    "version": "1.0.0",
+    "description": "A Node.js TypeScript library for resolving YAML documents containing !reference and !reference-all tags",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "yaml-reference-cli": "./dist/cli/index.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "lint": "eslint src/**/*.ts",
+        "prepublishOnly": "npm run build",
+        "prepare": "npm run build"
+    },
+    "keywords": [
+        "yaml",
+        "reference",
+        "resolver",
+        "configuration",
+        "typescript"
+    ],
+    "author": "David Sillman <dsillman2000@gmail.com>",
+    "license": "MIT",
+    "dependencies": {
+        "glob": "^13.0.1",
+        "yaml": "^2.8.2"
+    },
+    "devDependencies": {
+        "@types/glob": "^8.1.0",
+        "@types/jest": "^30.0.0",
+        "@types/node": "^25.2.2",
+        "@typescript-eslint/eslint-plugin": "^8.54.0",
+        "@typescript-eslint/parser": "^8.54.0",
+        "eslint": "^9.39.2",
+        "jest": "^30.2.0",
+        "ts-jest": "^29.4.6",
+        "typescript": "^5.9.3"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ]
+}

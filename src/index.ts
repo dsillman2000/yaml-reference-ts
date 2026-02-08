@@ -1,0 +1,26 @@
+/**
+ * Main exports for yaml-reference-ts library
+ */
+
+export { Reference } from "./Reference";
+export { ReferenceAll } from "./ReferenceAll";
+import { loadAndResolve, loadAndResolveSync } from "./resolver";
+export { parseYamlWithReferencesSync, parseYamlWithReferences } from "./parser";
+
+/**
+ * Convenience alias for loadAndResolve
+ * @param filePath - Path to YAML file containing references
+ * @returns Resolved object with all references resolved
+ */
+export async function loadYamlWithReferences(filePath: string): Promise<any> {
+    return await loadAndResolve(filePath);
+}
+
+/**
+ * Convenience alias for loadAndResolveSync
+ * @param filePath - Path to YAML file containing references
+ * @returns Resolved object with all references resolved
+ */
+export function loadYamlWithReferencesSync(filePath: string): any {
+    return loadAndResolveSync(filePath);
+}
