@@ -4,7 +4,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-package-lock.json
+
 yarn.lock
 pnpm-lock.yaml
 
@@ -144,3 +144,6 @@ test-example.js
 !__tests__/**/*.ts
 
 spec-test.sh
+
+# Keep eslintrc
+!.eslintrc.js
