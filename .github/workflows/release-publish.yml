@@ -47,6 +47,8 @@ jobs:
   release:
     needs: version
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
       - name: Checkout repository
