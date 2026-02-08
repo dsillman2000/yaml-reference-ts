@@ -1,0 +1,3 @@
+{
+    "yaml.customTags": ["!reference mapping", "!reference-all mapping"]
+}
