@@ -116,4 +116,4 @@ jobs:
           scope: "@dsillman2000"
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --access public
