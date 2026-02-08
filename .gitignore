@@ -144,3 +144,6 @@ test-example.js
 !__tests__/**/*.ts
 
 spec-test.sh
+
+# Keep eslintrc
+!.eslintrc.js
