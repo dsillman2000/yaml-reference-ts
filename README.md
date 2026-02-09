@@ -11,6 +11,10 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 - **CLI Interface**: Command-line tool for resolving YAML files
 - **TypeScript Support**: Full type definitions included
 
+## Spec
+
+This Node.js TypeScript library implements the YAML specification for cross-file references in YAML files using tags `!reference` and `!reference-all` as defined in the [yaml-reference-specs project](https://github.com/dsillman2000/yaml-reference-specs).
+
 ## Installation
 
 ```bash
@@ -56,11 +60,11 @@ files: !reference-all {glob: ./data/*.yaml}
 ### Basic Usage
 
 ```typescript
-import { loadAndResolve } from '@dsillman2000/yaml-reference-ts';
+import { loadYamlWithReferences } from '@dsillman2000/yaml-reference-ts';
 
 async function loadConfig() {
   try {
-    const resolved = await loadAndResolve('./config/main.yaml');
+    const resolved = await loadYamlWithReferences('./config/main.yaml');
     console.log(resolved);
   } catch (error) {
     console.error('Failed to resolve references:', error);
@@ -73,7 +77,7 @@ async function loadConfig() {
 #### `loadYamlWithReferences(filePath: string): Promise<any>`
 Loads a YAML file and resolves all `!reference` and `!reference-all` tags, returning the fully resolved object.
 
-#### `parseYamlWithReferences(content: string, filePath: string): any`
+#### `parseYamlWithReferences(content: string, filePath: string): Promise<any>`
 Parses YAML content with custom tags, setting `_location` on Reference objects.
 
 #### `loadYamlWithReferencesSync(filePath: string): any`
@@ -96,17 +100,67 @@ Represents a `!reference-all` tag with properties:
 
 The package includes a CLI tool called `yaml-reference-cli`:
 
+If an example `config.yaml` contains:
+```yaml
+services:
+  - !reference {path: services/etl-hub.yaml}
+  - !reference {path: services/etl-worker.yaml}
+connections: !reference-all {glob: databases/*.yaml}
+```
+
+With other files containing valid YAML data, then we can use the CLI to visualize the resolved YAML as JSON:
+
 ```bash
-# Basic usage
-yaml-reference-cli config.yaml
+# Basic usage (resolve references, stdout as json)
+$ yaml-reference-cli config.yaml
+  {
+    "connections": [
+      {
+        "name": "payments_pg",
+        "type": "postgres"
+      },
+      {
+        "name": "transactions_redis",
+        "type": "redis"
+      }
+    ],
+    "services": [
+      {
+        "name": "etl-hub",
+        "type": "service"
+      },
+      {
+        "name": "etl-worker",
+        "type": "service"
+      }
+    ]
+  }
+# Pipe to a file
+$ yaml-reference-cli config.yaml > .compiled/config.json
+```
 
-# With conversion back to YAML (requires yq)
-yaml-reference-cli config.yaml | yq -P
+If you have the `yq` CLI installed ([mikefarah/yq](https://github.com/mikefarah/yq)), resolved YAML can be pretty-printed as well (with keys sorted):
 
-# Save output to file
-yaml-reference-cli config.yaml | yq -P > .compiled/config.yaml
+```bash
+# Basic usage (resolve references, stdout as json, convert to YAML)
+$ yaml-reference-cli config.yaml | yq -P
+  connections:
+    - name: payments_pg
+      type: postgres
+    - name: transactions_redis
+      type: redis
+  services:
+    - name: etl-hub
+      type: service
+    - name: etl-worker
+      type: service
+# Pipe to a file
+$ yaml-reference-cli config.yaml | yq -P > .compiled/config.yaml
+```
 
-# Show help
+This basic CLI usage is also explained in the help message.
+
+```bash
 yaml-reference-cli --help
 ```
 
