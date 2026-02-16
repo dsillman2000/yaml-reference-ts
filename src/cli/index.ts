@@ -16,13 +16,14 @@ function showHelp(): void {
     console.log(`
 YAML Reference Resolver CLI
 
-Usage: yaml-reference-cli <file_path>
+Usage: yaml-reference-cli <file_path> [--allow <path1> --allow <path2>...]
 
 Resolves !reference and !reference-all tags in YAML files and outputs
 the resolved JSON to stdout.
 
 Arguments:
   file_path    Path to YAML file containing references (required)
+  allow_paths  Paths to allow references to (optional)
 
 Options:
   -h, --help   Show this help message
@@ -37,7 +38,7 @@ Examples:
 
 Exit Codes:
   0 - Success
-  1 - General error (file not found, invalid YAML, circular reference, etc.)
+  1 - General error (file not found or not allowed, invalid YAML, circular reference, etc.)
 `);
 }
 
@@ -74,22 +75,50 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
+    // Parse arguments
+    let filePath: string | null = null;
+    const allowPaths: string[] = [];
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+
+        if (arg === "--allow") {
+            if (i + 1 >= args.length) {
+                console.error("Error: --allow requires a path argument");
+                console.error(
+                    "Usage: yaml-reference-cli <file_path> [--allow <path1> --allow <path2>...]",
+                );
+                console.error("Use -h or --help for more information");
+                process.exit(1);
+            }
+            allowPaths.push(args[i + 1]);
+            i++; // Skip the next argument since we consumed it
+        } else if (arg.startsWith("-")) {
+            console.error(`Error: Unknown option: ${arg}`);
+            console.error("Use -h or --help for more information");
+            process.exit(1);
+        } else {
+            if (filePath !== null) {
+                console.error("Error: Multiple file paths provided");
+                console.error(
+                    "Usage: yaml-reference-cli <file_path> [--allow <path1> --allow <path2>...]",
+                );
+                console.error("Use -h or --help for more information");
+                process.exit(1);
+            }
+            filePath = arg;
+        }
+    }
+
     // Check for file path argument
-    if (args.length === 0) {
+    if (filePath === null) {
         console.error("Error: No file path provided");
-        console.error("Usage: yaml-reference-cli <file_path>");
+        console.error(
+            "Usage: yaml-reference-cli <file_path> [--allow <path1> --allow <path2>...]",
+        );
         console.error("Use -h or --help for more information");
         process.exit(1);
     }
-
-    if (args.length > 1) {
-        console.error("Error: Too many arguments");
-        console.error("Usage: yaml-reference-cli <file_path>");
-        console.error("Use -h or --help for more information");
-        process.exit(1);
-    }
-
-    const filePath = args[0];
 
     try {
         // Check if file exists
@@ -101,7 +130,10 @@ async function main(): Promise<void> {
 
     try {
         // Resolve references
-        const resolved = await loadAndResolve(filePath);
+        const resolved = await loadAndResolve(
+            filePath,
+            allowPaths.length > 0 ? allowPaths : undefined,
+        );
 
         // Sort keys alphabetically
         const sorted = sortObjectKeys(resolved);
