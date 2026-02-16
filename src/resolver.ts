@@ -12,48 +12,98 @@ import { ReferenceAll } from "./ReferenceAll";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
 
 /**
+ * Normalize allowPaths to always include the parent directory of filePath
+ */
+function normalizeAllowPaths(
+    filePath: string,
+    allowPaths?: string[],
+): string[] {
+    const parentDir = path.dirname(path.resolve(filePath));
+    const normalizedPaths: string[] = [];
+
+    // Add parent directory first
+    normalizedPaths.push(parentDir);
+
+    // Add any provided allowPaths that aren't already included
+    if (allowPaths && allowPaths.length > 0) {
+        for (const allowedPath of allowPaths) {
+            const resolvedAllowedPath = path.resolve(allowedPath);
+            if (!normalizedPaths.includes(resolvedAllowedPath)) {
+                normalizedPaths.push(resolvedAllowedPath);
+            }
+        }
+    }
+
+    return normalizedPaths;
+}
+
+/**
  * Load a YAML file containing references and resolve all references. (async)
  * @param filePath - Path to YAML file containing references
+ * @param allowPaths - Optional list of allowed paths for references
  * @returns Resolved object with all references resolved
  */
-export async function loadAndResolve(filePath: string): Promise<any> {
+export async function loadAndResolve(
+    filePath: string,
+    allowPaths?: string[],
+): Promise<any> {
     const parsed = await parseYamlWithReferences(filePath);
-    return await _recursivelyResolveReferences(parsed, new Set<string>());
+    const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
+    return await _recursivelyResolveReferences(
+        parsed,
+        new Set<string>(),
+        normalizedAllowPaths,
+    );
 }
 
 /**
  * Load a YAML file containing references and resolve all references.
  * @param filePath - Path to YAML file containing references
+ * @param allowPaths - Optional list of allowed paths for references
  * @returns Resolved object with all references resolved
  */
-export function loadAndResolveSync(filePath: string): any {
+export function loadAndResolveSync(
+    filePath: string,
+    allowPaths?: string[],
+): any {
     const parsed = parseYamlWithReferencesSync(filePath);
-    return _recursivelyResolveReferencesSync(parsed, new Set<string>());
+    const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
+    return _recursivelyResolveReferencesSync(
+        parsed,
+        new Set<string>(),
+        normalizedAllowPaths,
+    );
 }
 
 /**
  * Recursively resolve all references in an object (async)
  * @param obj - Object that may contain Reference or ReferenceAll instances
  * @param visitedPaths - Set of visited file paths to detect circular references
+ * @param allowPaths - Optional list of allowed paths for references
  * @returns Object with all references resolved
  */
 export async function _recursivelyResolveReferences(
     obj: any,
     visitedPaths: Set<string> = new Set(),
+    allowPaths?: string[],
 ): Promise<any> {
     if (obj instanceof Reference) {
-        return await resolveReference(obj, visitedPaths);
+        return await resolveReference(obj, visitedPaths, allowPaths);
     }
 
     if (obj instanceof ReferenceAll) {
-        return await resolveReferenceAll(obj, visitedPaths);
+        return await resolveReferenceAll(obj, visitedPaths, allowPaths);
     }
 
     if (Array.isArray(obj)) {
         const resolvedArray = [];
         for (const item of obj) {
             resolvedArray.push(
-                await _recursivelyResolveReferences(item, visitedPaths),
+                await _recursivelyResolveReferences(
+                    item,
+                    visitedPaths,
+                    allowPaths,
+                ),
             );
         }
         return resolvedArray;
@@ -65,6 +115,7 @@ export async function _recursivelyResolveReferences(
             resolvedObj[key] = await _recursivelyResolveReferences(
                 value,
                 visitedPaths,
+                allowPaths,
             );
         }
         return resolvedObj;
@@ -77,25 +128,31 @@ export async function _recursivelyResolveReferences(
  * Recursively resolve all references in an object
  * @param obj - Object that may contain Reference or ReferenceAll instances
  * @param visitedPaths - Set of visited file paths to detect circular references
+ * @param allowPaths - Optional list of allowed paths for references
  * @returns Object with all references resolved
  */
 export function _recursivelyResolveReferencesSync(
     obj: any,
     visitedPaths: Set<string> = new Set(),
+    allowPaths?: string[],
 ): any {
     if (obj instanceof Reference) {
-        return resolveReferenceSync(obj, visitedPaths);
+        return resolveReferenceSync(obj, visitedPaths, allowPaths);
     }
 
     if (obj instanceof ReferenceAll) {
-        return resolveReferenceAllSync(obj, visitedPaths);
+        return resolveReferenceAllSync(obj, visitedPaths, allowPaths);
     }
 
     if (Array.isArray(obj)) {
         const resolvedArray = [];
         for (const item of obj) {
             resolvedArray.push(
-                _recursivelyResolveReferencesSync(item, visitedPaths),
+                _recursivelyResolveReferencesSync(
+                    item,
+                    visitedPaths,
+                    allowPaths,
+                ),
             );
         }
         return resolvedArray;
@@ -107,6 +164,7 @@ export function _recursivelyResolveReferencesSync(
             resolvedObj[key] = _recursivelyResolveReferencesSync(
                 value,
                 visitedPaths,
+                allowPaths,
             );
         }
         return resolvedObj;
@@ -119,12 +177,14 @@ export function _recursivelyResolveReferencesSync(
  * Resolve a single Reference object (async)
  * @param ref Reference object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
+ * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved object. Will not contain any references.
  * @throws Error if circular reference is detected, or if a reference cannot be resolved
  */
 async function resolveReference(
     ref: Reference,
     visitedPaths: Set<string>,
+    allowPaths?: string[],
 ): Promise<any> {
     if (!ref._location) {
         throw new Error(`Reference missing _location: ${ref.toString()}`);
@@ -132,6 +192,21 @@ async function resolveReference(
 
     const refDir = path.dirname(ref._location);
     const targetPath = path.resolve(refDir, ref.path);
+
+    // Check if path is allowed
+    if (allowPaths && allowPaths.length > 0) {
+        const isAllowed = allowPaths.some((allowedPath) => {
+            const resolvedAllowedPath = path.resolve(allowedPath);
+            const resolvedTargetPath = path.resolve(targetPath);
+            return resolvedTargetPath.startsWith(resolvedAllowedPath);
+        });
+
+        if (!isAllowed) {
+            throw new Error(
+                `Reference to ${targetPath} is not allowed. Allowed paths: ${allowPaths.join(", ")}`,
+            );
+        }
+    }
 
     // Check for circular references
     if (visitedPaths.has(targetPath)) {
@@ -156,7 +231,11 @@ async function resolveReference(
     const parsed = await parseYamlWithReferences(targetPath);
 
     // Recursively resolve references in the parsed content
-    const resolved = await _recursivelyResolveReferences(parsed, visitedPaths);
+    const resolved = await _recursivelyResolveReferences(
+        parsed,
+        visitedPaths,
+        allowPaths,
+    );
 
     // Remove from visited paths after resolution
     visitedPaths.delete(targetPath);
@@ -168,16 +247,36 @@ async function resolveReference(
  * Resolve a single Reference object
  * @param ref Reference object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
+ * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved object. Will not contain any references.
  * @throws Error if circular reference is detected, or if a reference cannot be resolved
  */
-function resolveReferenceSync(ref: Reference, visitedPaths: Set<string>): any {
+function resolveReferenceSync(
+    ref: Reference,
+    visitedPaths: Set<string>,
+    allowPaths?: string[],
+): any {
     if (!ref._location) {
         throw new Error(`Reference missing _location: ${ref.toString()}`);
     }
 
     const refDir = path.dirname(ref._location);
     const targetPath = path.resolve(refDir, ref.path);
+
+    // Check if path is allowed
+    if (allowPaths && allowPaths.length > 0) {
+        const isAllowed = allowPaths.some((allowedPath) => {
+            const resolvedAllowedPath = path.resolve(allowedPath);
+            const resolvedTargetPath = path.resolve(targetPath);
+            return resolvedTargetPath.startsWith(resolvedAllowedPath);
+        });
+
+        if (!isAllowed) {
+            throw new Error(
+                `Reference to ${targetPath} is not allowed. Allowed paths: ${allowPaths.join(", ")}`,
+            );
+        }
+    }
 
     // Check for circular references
     if (visitedPaths.has(targetPath)) {
@@ -202,7 +301,11 @@ function resolveReferenceSync(ref: Reference, visitedPaths: Set<string>): any {
     const parsed = parseYamlWithReferencesSync(targetPath);
 
     // Recursively resolve references in the parsed content
-    const resolved = _recursivelyResolveReferencesSync(parsed, visitedPaths);
+    const resolved = _recursivelyResolveReferencesSync(
+        parsed,
+        visitedPaths,
+        allowPaths,
+    );
 
     // Remove from visited paths after resolution
     visitedPaths.delete(targetPath);
@@ -214,12 +317,14 @@ function resolveReferenceSync(ref: Reference, visitedPaths: Set<string>): any {
  * Resolve a ReferenceAll object (async)
  * @param refAll ReferenceAll object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
+ * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved array of objects. Will not contain any references.
  * @throws Error if the ReferenceAll object is missing _location or if the glob pattern is invalid.
  */
 async function resolveReferenceAll(
     refAll: ReferenceAll,
     visitedPaths: Set<string>,
+    allowPaths?: string[],
 ): Promise<any[]> {
     if (!refAll._location) {
         throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
@@ -242,6 +347,17 @@ async function resolveReferenceAll(
     matchingFiles = matchingFiles.filter(
         (file) => file.endsWith(".yaml") || file.endsWith(".yml"),
     );
+
+    // Filter by allowed paths if specified
+    if (allowPaths && allowPaths.length > 0) {
+        matchingFiles = matchingFiles.filter((filePath) => {
+            const resolvedFilePath = path.resolve(filePath);
+            return allowPaths.some((allowedPath) => {
+                const resolvedAllowedPath = path.resolve(allowedPath);
+                return resolvedFilePath.startsWith(resolvedAllowedPath);
+            });
+        });
+    }
 
     if (matchingFiles.length === 0) {
         throw new Error(
@@ -272,6 +388,7 @@ async function resolveReferenceAll(
             const resolved = await _recursivelyResolveReferences(
                 parsed,
                 visitedPaths,
+                allowPaths,
             );
             resolvedContents.push(resolved);
         } catch (error) {
@@ -285,16 +402,19 @@ async function resolveReferenceAll(
 
     return resolvedContents;
 }
+
 /**
  * Resolve a ReferenceAll object
  * @param refAll ReferenceAll object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
+ * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved array of objects. Will not contain any references.
  * @throws Error if the ReferenceAll object is missing _location or if the glob pattern is invalid.
  */
 function resolveReferenceAllSync(
     refAll: ReferenceAll,
     visitedPaths: Set<string>,
+    allowPaths?: string[],
 ): any[] {
     if (!refAll._location) {
         throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
@@ -317,6 +437,17 @@ function resolveReferenceAllSync(
     matchingFiles = matchingFiles.filter(
         (file) => file.endsWith(".yaml") || file.endsWith(".yml"),
     );
+
+    // Filter by allowed paths if specified
+    if (allowPaths && allowPaths.length > 0) {
+        matchingFiles = matchingFiles.filter((filePath) => {
+            const resolvedFilePath = path.resolve(filePath);
+            return allowPaths.some((allowedPath) => {
+                const resolvedAllowedPath = path.resolve(allowedPath);
+                return resolvedFilePath.startsWith(resolvedAllowedPath);
+            });
+        });
+    }
 
     if (matchingFiles.length === 0) {
         throw new Error(
@@ -347,6 +478,7 @@ function resolveReferenceAllSync(
             const resolved = _recursivelyResolveReferencesSync(
                 parsed,
                 visitedPaths,
+                allowPaths,
             );
             resolvedContents.push(resolved);
         } catch (error) {

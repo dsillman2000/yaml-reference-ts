@@ -277,7 +277,138 @@ describe("Resolver", () => {
             );
             await createTestYamlFile(configDir, "database.yaml", dbYaml);
 
-            const result = await loadYamlWithReferences(mainPath);
+            const result = await loadYamlWithReferences(mainPath, [configDir]);
+
+            expect(result).toEqual({
+                config: {
+                    host: "localhost",
+                    port: 5432,
+                },
+            });
+        });
+
+        it("should throw error when trying to use absolute path in reference", async () => {
+            const mainYaml = `
+        config: !reference
+          path: /absolute/path/database.yaml
+      `;
+
+            const mainPath = await createTestYamlFile(
+                tempDir,
+                "main.yaml",
+                mainYaml,
+            );
+
+            await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+                /Reference path must be relative, not absolute/,
+            );
+        });
+
+        it("should throw error when trying to use absolute path in reference-all", async () => {
+            const mainYaml = `
+        configs: !reference-all
+          glob: /absolute/path/*.yaml
+      `;
+
+            const mainPath = await createTestYamlFile(
+                tempDir,
+                "main.yaml",
+                mainYaml,
+            );
+
+            await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+                /ReferenceAll glob must be relative, not absolute/,
+            );
+        });
+
+        it("should not allow referencing file in parent directory without explicit allowPaths", async () => {
+            const mainYaml = `
+        config: !reference
+          path: ../config/database.yaml
+      `;
+
+            const dbYaml = `
+        host: localhost
+        port: 5432
+      `;
+
+            const subDir = `${tempDir}/sub`;
+            await fs.mkdir(subDir, { recursive: true });
+            const configDir = `${tempDir}/config`;
+            await fs.mkdir(configDir, { recursive: true });
+
+            const mainPath = await createTestYamlFile(
+                subDir,
+                "main.yaml",
+                mainYaml,
+            );
+            await createTestYamlFile(configDir, "database.yaml", dbYaml);
+
+            // Should fail without allowPaths since parent directory is not in allowed paths
+            await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+                /is not allowed/,
+            );
+        });
+
+        it("should allow referencing file in parent directory with explicit allowPaths", async () => {
+            const mainYaml = `
+        config: !reference
+          path: ../config/database.yaml
+      `;
+
+            const dbYaml = `
+        host: localhost
+        port: 5432
+      `;
+
+            const subDir = `${tempDir}/sub`;
+            await fs.mkdir(subDir, { recursive: true });
+            const configDir = `${tempDir}/config`;
+            await fs.mkdir(configDir, { recursive: true });
+
+            const mainPath = await createTestYamlFile(
+                subDir,
+                "main.yaml",
+                mainYaml,
+            );
+            await createTestYamlFile(configDir, "database.yaml", dbYaml);
+
+            // Should succeed with allowPaths that includes the config directory
+            const result = await loadYamlWithReferences(mainPath, [configDir]);
+
+            expect(result).toEqual({
+                config: {
+                    host: "localhost",
+                    port: 5432,
+                },
+            });
+        });
+
+        it("should allow referencing file in parent directory when allowPaths includes parent directory", async () => {
+            const mainYaml = `
+        config: !reference
+          path: ../config/database.yaml
+      `;
+
+            const dbYaml = `
+        host: localhost
+        port: 5432
+      `;
+
+            const subDir = `${tempDir}/sub`;
+            await fs.mkdir(subDir, { recursive: true });
+            const configDir = `${tempDir}/config`;
+            await fs.mkdir(configDir, { recursive: true });
+
+            const mainPath = await createTestYamlFile(
+                subDir,
+                "main.yaml",
+                mainYaml,
+            );
+            await createTestYamlFile(configDir, "database.yaml", dbYaml);
+
+            // Should succeed with allowPaths that includes the temp directory (parent of both sub and config)
+            const result = await loadYamlWithReferences(mainPath, [tempDir]);
 
             expect(result).toEqual({
                 config: {

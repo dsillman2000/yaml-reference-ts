@@ -1,3 +1,5 @@
+import * as pathModule from "path";
+
 /**
  * ReferenceAll class representing a !reference-all tag in YAML
  * This class is instantiated when the YAML parser encounters a !reference-all tag
@@ -21,6 +23,18 @@ export class ReferenceAll {
      * @param location - Absolute path to the file containing this reference (optional, will be set later)
      */
     constructor(glob: string, location?: string) {
+        // Ensure glob is not empty
+        if (!glob || glob.length === 0) {
+            throw new Error("ReferenceAll glob must not be empty");
+        }
+
+        // Validate that glob is not absolute
+        if (glob && glob.length > 0 && pathModule.isAbsolute(glob)) {
+            throw new Error(
+                `ReferenceAll glob must be relative, not absolute: "${glob}"`,
+            );
+        }
+
         this.glob = glob;
         this._location = location || "";
     }

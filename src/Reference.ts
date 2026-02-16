@@ -1,3 +1,5 @@
+import * as pathModule from "path";
+
 /**
  * Reference class representing a !reference tag in YAML
  * This class is instantiated when the YAML parser encounters a !reference tag
@@ -21,6 +23,18 @@ export class Reference {
      * @param location - Absolute path to the file containing this reference (optional, will be set later)
      */
     constructor(path: string, location?: string) {
+        // Ensure path is not empty
+        if (!path || path.length === 0) {
+            throw new Error("Reference path must not be empty");
+        }
+
+        // Validate that path is not absolute
+        if (path && path.length > 0 && pathModule.isAbsolute(path)) {
+            throw new Error(
+                `Reference path must be relative, not absolute: "${path}"`,
+            );
+        }
+
         this.path = path;
         this._location = location || "";
     }
