@@ -4,8 +4,9 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 
 ## Features
 
-- **Custom YAML Tags**: Support for `!reference` and `!reference-all` tags
+- **Custom YAML Tags**: Support for `!reference`, `!reference-all`, and `!flatten` tags
 - **Recursive Resolution**: Automatically resolves nested references
+- **Sequence Flattening**: `!flatten` tag for flattening nested arrays
 - **Circular Reference Detection**: Prevents infinite loops with proper error messages
 - **Glob Pattern Support**: `!reference-all` supports glob patterns for multiple files
 - **CLI Interface**: Command-line tool for resolving YAML files
@@ -13,7 +14,7 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 
 ## Spec
 
-This Node.js TypeScript library implements the YAML specification for cross-file references in YAML files using tags `!reference` and `!reference-all` as defined in the [yaml-reference-specs project](https://github.com/dsillman2000/yaml-reference-specs).
+This Node.js TypeScript library implements the YAML specification for cross-file references in YAML files using tags `!reference`, `!reference-all` and `!flatten` tags as defined in the [yaml-reference-specs project](https://github.com/dsillman2000/yaml-reference-specs).
 
 ## Installation
 
@@ -51,7 +52,21 @@ configs: !reference-all
 files: !reference-all {glob: ./data/*.yaml}
 ```
 
-**Note**: Only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>}` or `!reference-all {glob: <glob>}`).
+### Sequence Flattening
+
+```yaml
+# Block sequence syntax
+data: !flatten
+  - 1
+  - [2, 3]
+  - !reference
+    path: ./config/item.yaml
+
+# Inline sequence syntax
+simple: !flatten [1, 2, 3]
+```
+
+**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>}` or `!reference-all {glob: <glob>}`). For `!flatten` tags, only sequence syntax is supported.
 
 **Deterministic Ordering**: The `!reference-all` tag resolves files in alphabetical order to ensure consistent, predictable results across different systems and runs.
 
@@ -75,16 +90,16 @@ async function loadConfig() {
 ### API Reference
 
 #### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<any>`
-Loads a YAML file and resolves all `!reference` and `!reference-all` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+Loads a YAML file and resolves all `!reference`, `!reference-all`, and `!flatten` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferences(content: string, filePath: string): Promise<any>`
-Parses YAML content with custom tags, setting `_location` on Reference objects.
+Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects.
 
 #### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
-Loads a YAML file and resolves all `!reference` and `!reference-all` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+Loads a YAML file and resolves all `!reference`, `!reference-all`, and `!flatten` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferencesSync(content: string, filePath: string): any`
-Parses YAML content with custom tags, setting `_location` on Reference objects synchronously.
+Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects synchronously.
 
 #### `Reference` Class
 Represents a `!reference` tag with properties:
@@ -95,6 +110,10 @@ Represents a `!reference` tag with properties:
 Represents a `!reference-all` tag with properties:
 - `_location`: Absolute path to the file containing the reference
 - `glob`: Glob pattern to match YAML files
+
+#### `Flatten` Class
+Represents a `!flatten` tag with properties:
+- `sequence`: The sequence to be flattened (can contain nested arrays, Reference, and ReferenceAll objects)
 
 ## CLI Usage
 
@@ -237,9 +256,18 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 7. Files are sorted and resolved in deterministic alphabetical order for consistent results across systems
 8. If no files match, an error is thrown
 
+### For `!flatten` tags:
+1. The sequence is parsed from the YAML (must be a sequence/array)
+3. The sequence is recursively flattened:
+   - Nested arrays are flattened into a single-level array
+   - `Reference` and `ReferenceAll` objects are resolved first, then flattened
+   - Other values are preserved as-is
+4. The `Flatten` object is replaced with the flattened array. No elements of the resulting array are themselves arrays.
+
 **Deterministic Behavior**: The library ensures predictable output by:
 - Sorting `!reference-all` file matches alphabetically before resolution
-- Rejecting scalar syntax (only mapping syntax is allowed)
+- Rejecting scalar syntax for `!reference` and `!reference-all` tags (only mapping syntax is allowed)
+- Rejecting mapping syntax for `!flatten` tags (only sequence syntax is allowed)
 - Using consistent error messages for validation failures
 - Enforcing path restrictions to prevent unauthorized file access
 
@@ -253,6 +281,7 @@ The library throws descriptive errors for:
 - Missing required properties (`path` for `!reference`, `glob` for `!reference-all`)
 - Absolute paths in `!reference` or `!reference-all` tags (only relative paths are allowed)
 - References to files outside allowed paths
+- `!flatten` tag applied to non-sequence values
 
 ## Development
 

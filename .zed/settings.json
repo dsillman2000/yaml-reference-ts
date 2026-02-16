@@ -5,7 +5,8 @@
                 "yaml": {
                     "customTags": [
                         "!reference mapping",
-                        "!reference-all mapping"
+                        "!reference-all mapping",
+                        "!flatten sequence"
                     ]
                 }
             }

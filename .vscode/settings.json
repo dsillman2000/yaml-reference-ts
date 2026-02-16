@@ -1,3 +1,7 @@
 {
-    "yaml.customTags": ["!reference mapping", "!reference-all mapping"]
+    "yaml.customTags": [
+        "!reference mapping",
+        "!reference-all mapping",
+        "!flatten sequence"
+    ]
 }
