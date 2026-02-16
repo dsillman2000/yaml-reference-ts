@@ -28,6 +28,113 @@ describe("Resolver", () => {
             await cleanupTempDir(tempDir);
         });
 
+        describe("flatten tag", () => {
+            it("should flatten simple array: !flatten [1, 2, 3] -> [1, 2, 3]", async () => {
+                const mainYaml = `
+          data: !flatten
+            - 1
+            - 2
+            - 3
+        `;
+
+                const mainPath = await createTestYamlFile(
+                    tempDir,
+                    "main.yaml",
+                    mainYaml,
+                );
+
+                const result = await loadYamlWithReferences(mainPath);
+
+                expect(result).toEqual({
+                    data: [1, 2, 3],
+                });
+            });
+
+            it("should flatten nested arrays: !flatten [1, [2, [3]]] -> [1, 2, 3]", async () => {
+                const mainYaml = `
+          data: !flatten
+            - 1
+            -
+              - 2
+              -
+                - 3
+        `;
+
+                const mainPath = await createTestYamlFile(
+                    tempDir,
+                    "main.yaml",
+                    mainYaml,
+                );
+
+                const result = await loadYamlWithReferences(mainPath);
+
+                expect(result).toEqual({
+                    data: [1, 2, 3],
+                });
+            });
+
+            it("should flatten array with reference: !flatten [1, !reference] -> [1, result]", async () => {
+                const mainYaml = `
+          data: !flatten
+            - 1
+            - !reference
+              path: ref.yaml
+        `;
+
+                const refYaml = `
+          result: value
+        `;
+
+                const mainPath = await createTestYamlFile(
+                    tempDir,
+                    "main.yaml",
+                    mainYaml,
+                );
+                await createTestYamlFile(tempDir, "ref.yaml", refYaml);
+
+                const result = await loadYamlWithReferences(mainPath);
+
+                expect(result).toEqual({
+                    data: [1, { result: "value" }],
+                });
+            });
+
+            it("should flatten array with reference-all: !flatten [1, !reference-all] -> [1, result, result]", async () => {
+                const mainYaml = `
+          data: !flatten
+            - 1
+            - !reference-all
+              glob: refs/*.yaml
+        `;
+
+                const ref1Yaml = `
+          result: value1
+        `;
+
+                const ref2Yaml = `
+          result: value2
+        `;
+
+                const refsDir = `${tempDir}/refs`;
+                await fs.mkdir(refsDir, { recursive: true });
+
+                const mainPath = await createTestYamlFile(
+                    tempDir,
+                    "main.yaml",
+                    mainYaml,
+                );
+                await createTestYamlFile(refsDir, "file1.yaml", ref1Yaml);
+                await createTestYamlFile(refsDir, "file2.yaml", ref2Yaml);
+
+                const result = await loadYamlWithReferences(mainPath);
+
+                expect(result.data).toHaveLength(3);
+                expect(result.data[0]).toBe(1);
+                expect(result.data[1]).toEqual({ result: "value1" });
+                expect(result.data[2]).toEqual({ result: "value2" });
+            });
+        });
+
         it("should resolve simple reference", async () => {
             const mainYaml = `
         database: !reference

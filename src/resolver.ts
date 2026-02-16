@@ -9,6 +9,7 @@ import * as fsSync from "fs";
 import { glob, globSync } from "glob";
 import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
+import { Flatten } from "./Flatten";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
 
 /**
@@ -38,6 +39,41 @@ function normalizeAllowPaths(
 }
 
 /**
+ * Recursively flatten all arrays in an object
+ * @param obj - Object that may contain nested arrays
+ * @returns Object with all arrays flattened
+ */
+export function flattenSequences(obj: any): any {
+    if (Array.isArray(obj)) {
+        const flattened: any[] = [];
+        for (const item of obj) {
+            const flattenedItem = flattenSequences(item);
+            if (Array.isArray(flattenedItem)) {
+                flattened.push(...flattenedItem);
+            } else {
+                flattened.push(flattenedItem);
+            }
+        }
+        return flattened;
+    }
+
+    if (obj && typeof obj === "object") {
+        if (obj instanceof Flatten) {
+            // Flatten the sequence inside the Flatten object
+            return flattenSequences(obj.sequence);
+        }
+
+        const result: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = flattenSequences(value);
+        }
+        return result;
+    }
+
+    return obj;
+}
+
+/**
  * Load a YAML file containing references and resolve all references. (async)
  * @param filePath - Path to YAML file containing references
  * @param allowPaths - Optional list of allowed paths for references
@@ -49,11 +85,12 @@ export async function loadAndResolve(
 ): Promise<any> {
     const parsed = await parseYamlWithReferences(filePath);
     const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
-    return await _recursivelyResolveReferences(
+    const resolved = await _recursivelyResolveReferences(
         parsed,
         new Set<string>(),
         normalizedAllowPaths,
     );
+    return flattenSequences(resolved);
 }
 
 /**
@@ -68,11 +105,12 @@ export function loadAndResolveSync(
 ): any {
     const parsed = parseYamlWithReferencesSync(filePath);
     const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
-    return _recursivelyResolveReferencesSync(
+    const resolved = _recursivelyResolveReferencesSync(
         parsed,
         new Set<string>(),
         normalizedAllowPaths,
     );
+    return flattenSequences(resolved);
 }
 
 /**
@@ -93,6 +131,21 @@ export async function _recursivelyResolveReferences(
 
     if (obj instanceof ReferenceAll) {
         return await resolveReferenceAll(obj, visitedPaths, allowPaths);
+    }
+
+    if (obj instanceof Flatten) {
+        // Resolve references within the sequence first, then flatten will be applied later
+        const resolvedSequence = [];
+        for (const item of obj.sequence) {
+            resolvedSequence.push(
+                await _recursivelyResolveReferences(
+                    item,
+                    visitedPaths,
+                    allowPaths,
+                ),
+            );
+        }
+        return new Flatten(resolvedSequence);
     }
 
     if (Array.isArray(obj)) {
@@ -142,6 +195,21 @@ export function _recursivelyResolveReferencesSync(
 
     if (obj instanceof ReferenceAll) {
         return resolveReferenceAllSync(obj, visitedPaths, allowPaths);
+    }
+
+    if (obj instanceof Flatten) {
+        // Resolve references within the sequence first, then flatten will be applied later
+        const resolvedSequence = [];
+        for (const item of obj.sequence) {
+            resolvedSequence.push(
+                _recursivelyResolveReferencesSync(
+                    item,
+                    visitedPaths,
+                    allowPaths,
+                ),
+            );
+        }
+        return new Flatten(resolvedSequence);
     }
 
     if (Array.isArray(obj)) {

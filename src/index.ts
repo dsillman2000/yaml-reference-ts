@@ -4,6 +4,7 @@
 
 export { Reference } from "./Reference";
 export { ReferenceAll } from "./ReferenceAll";
+export { Flatten } from "./Flatten";
 import { loadAndResolve, loadAndResolveSync } from "./resolver";
 export { parseYamlWithReferencesSync, parseYamlWithReferences } from "./parser";
 
