@@ -57,28 +57,40 @@ function normalizeAllowPaths(
 }
 
 /**
- * Recursively flatten all arrays in an object
- * @param obj - Object that may contain nested arrays
- * @returns Object with all arrays flattened
+ * Recursively flatten an array, spreading nested arrays and processing
+ * any Flatten/Merge instances found within. Only used by !flatten and !merge handlers.
+ * @param arr - Array to deeply flatten
+ * @returns Flat array with all nested arrays expanded
+ */
+function flattenArray(arr: any[]): any[] {
+  const result: any[] = [];
+  for (const item of arr) {
+    const processed = flattenSequences(item);
+    if (Array.isArray(processed)) {
+      result.push(...flattenArray(processed));
+    } else {
+      result.push(processed);
+    }
+  }
+  return result;
+}
+
+/**
+ * Recursively process an object tree, resolving Flatten and Merge instances.
+ * Plain arrays are traversed but NOT flattened — only !flatten-tagged sequences
+ * are flattened.
+ * @param obj - Object that may contain Flatten or Merge instances
+ * @returns Object with all Flatten/Merge instances resolved
  */
 export function flattenSequences(obj: any): any {
   if (Array.isArray(obj)) {
-    const flattened: any[] = [];
-    for (const item of obj) {
-      const flattenedItem = flattenSequences(item);
-      if (Array.isArray(flattenedItem)) {
-        flattened.push(...flattenedItem);
-      } else {
-        flattened.push(flattenedItem);
-      }
-    }
-    return flattened;
+    return obj.map((item) => flattenSequences(item));
   }
 
   if (obj && typeof obj === "object") {
     if (obj instanceof Flatten) {
       // Flatten the sequence inside the Flatten object
-      return flattenSequences(obj.sequence);
+      return flattenArray(obj.sequence);
     }
 
     if (obj instanceof Merge) {
@@ -86,8 +98,8 @@ export function flattenSequences(obj: any): any {
       const processedItems = obj.sequence.map((item: any) =>
         flattenSequences(item),
       );
-      // Flatten nested arrays (flattenSequences already handles recursive array flattening)
-      const flattened = flattenSequences(processedItems);
+      // Flatten nested arrays (only within this merge context)
+      const flattened = flattenArray(processedItems);
       // Validate all items are objects (not null, not array, not scalar)
       for (let i = 0; i < flattened.length; i++) {
         const item = flattened[i];

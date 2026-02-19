@@ -133,6 +133,28 @@ describe("Resolver", () => {
         expect(result.data[1]).toEqual({ result: "value1" });
         expect(result.data[2]).toEqual({ result: "value2" });
       });
+
+      it("should not flatten plain nested arrays without !flatten tag", async () => {
+        const mainYaml = `
+          data:
+            - a
+            - b
+            - - c
+              - d
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          data: ["a", "b", ["c", "d"]],
+        });
+      });
     });
 
     describe("merge tag", () => {
