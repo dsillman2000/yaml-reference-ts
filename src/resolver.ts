@@ -10,6 +10,7 @@ import { glob, globSync } from "glob";
 import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
+import { Merge } from "./Merge";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
 
 /**
@@ -78,6 +79,37 @@ export function flattenSequences(obj: any): any {
     if (obj instanceof Flatten) {
       // Flatten the sequence inside the Flatten object
       return flattenSequences(obj.sequence);
+    }
+
+    if (obj instanceof Merge) {
+      // First, recursively apply flattenSequences to each item
+      const processedItems = obj.sequence.map((item: any) =>
+        flattenSequences(item),
+      );
+      // Flatten nested arrays (flattenSequences already handles recursive array flattening)
+      const flattened = flattenSequences(processedItems);
+      // Validate all items are objects (not null, not array, not scalar)
+      for (let i = 0; i < flattened.length; i++) {
+        const item = flattened[i];
+        if (
+          item === null ||
+          item === undefined ||
+          typeof item !== "object" ||
+          Array.isArray(item)
+        ) {
+          const itemType =
+            item === null
+              ? "null"
+              : Array.isArray(item)
+                ? "array"
+                : typeof item;
+          throw new Error(
+            `!merge: all items must be objects after flattening, but found ${itemType} at index ${i}`,
+          );
+        }
+      }
+      // Spread-merge with last-write-wins
+      return Object.assign({}, ...flattened);
     }
 
     const result: any = {};
@@ -161,6 +193,17 @@ export async function _recursivelyResolveReferences(
     return new Flatten(resolvedSequence);
   }
 
+  if (obj instanceof Merge) {
+    // Resolve references within the sequence first, then merge will be applied later
+    const resolvedSequence = [];
+    for (const item of obj.sequence) {
+      resolvedSequence.push(
+        await _recursivelyResolveReferences(item, visitedPaths, allowPaths),
+      );
+    }
+    return new Merge(resolvedSequence);
+  }
+
   if (Array.isArray(obj)) {
     const resolvedArray = [];
     for (const item of obj) {
@@ -215,6 +258,17 @@ export function _recursivelyResolveReferencesSync(
       );
     }
     return new Flatten(resolvedSequence);
+  }
+
+  if (obj instanceof Merge) {
+    // Resolve references within the sequence first, then merge will be applied later
+    const resolvedSequence = [];
+    for (const item of obj.sequence) {
+      resolvedSequence.push(
+        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths),
+      );
+    }
+    return new Merge(resolvedSequence);
   }
 
   if (Array.isArray(obj)) {

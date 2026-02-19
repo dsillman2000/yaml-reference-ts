@@ -135,6 +135,425 @@ describe("Resolver", () => {
       });
     });
 
+    describe("merge tag", () => {
+      it("should merge two objects with overlapping keys using last-write-wins", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1, b: 2 }
+            - { b: 3, c: 4 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 3, c: 4 },
+        });
+      });
+
+      it("should merge two objects with no overlapping keys", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1, b: 2 }
+            - { c: 3, d: 4 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2, c: 3, d: 4 },
+        });
+      });
+
+      it("should merge three objects with last-write-wins across all", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - { a: 2, b: 1 }
+            - { a: 3, c: 1 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 3, b: 1, c: 1 },
+        });
+      });
+
+      it("should pass through a single object unchanged", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1, b: 2 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2 },
+        });
+      });
+
+      it("should yield an empty object for an empty sequence", async () => {
+        const mainYaml = `
+          result: !merge []
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: {},
+        });
+      });
+
+      it("should allow null value in a later object to override an earlier non-null value", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: "value", b: "keep" }
+            - { a: null }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: null, b: "keep" },
+        });
+      });
+
+      it("should perform shallow merge — nested objects replaced entirely", async () => {
+        const mainYaml = `
+          result: !merge
+            - { config: { retries: 3, timeout: 10 } }
+            - { config: { timeout: 30 } }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { config: { timeout: 30 } },
+        });
+      });
+
+      it("should internally flatten nested sequences of objects before merging", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - - { b: 2 }
+              - { c: 3 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2, c: 3 },
+        });
+      });
+
+      it("should internally flatten deeply nested sequences of objects before merging", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - [[{ b: 2 }], [{ c: 3 }]]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2, c: 3 },
+        });
+      });
+
+      it("should resolve inner merge before outer merge with nested !merge tags", async () => {
+        const mainYaml = `
+          result: !merge
+            - a: 1
+              inner: !merge
+                - { x: 1, y: 1 }
+                - { x: 2 }
+            - { b: 2 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2, inner: { x: 2, y: 1 } },
+        });
+      });
+
+      it("should throw error when a scalar value is in the merge sequence", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - "not an object"
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+          /!merge: all items must be objects after flattening/,
+        );
+      });
+
+      it("should throw error when a sequence containing a scalar is present after internal flattening", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - [1, 2, 3]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+          /!merge: all items must be objects after flattening/,
+        );
+      });
+
+      it("should throw error when a deeply nested sequence containing a scalar is present after internal flattening", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - [[["deep scalar"]]]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+          /!merge: all items must be objects after flattening/,
+        );
+      });
+
+      it("should throw error when mixed objects and scalars are present after internal flattening", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1 }
+            - [{ b: 2 }, "not an object"]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+          /!merge: all items must be objects after flattening/,
+        );
+      });
+
+      it("should merge a referenced object with local overrides", async () => {
+        const defaultsYaml = `
+          default_key: default_value
+          override_key: original
+        `;
+
+        const mainYaml = `
+          result: !merge
+            - !reference { path: defaults.yaml }
+            - { override_key: custom }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+        await createTestYamlFile(tempDir, "defaults.yaml", defaultsYaml);
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { default_key: "default_value", override_key: "custom" },
+        });
+      });
+
+      it("should merge multiple referenced objects with last-write-wins", async () => {
+        const baseYaml = `
+          a: 1
+          b: 2
+        `;
+
+        const overridesYaml = `
+          b: 3
+          c: 4
+        `;
+
+        const mainYaml = `
+          result: !merge
+            - !reference { path: base.yaml }
+            - !reference { path: overrides.yaml }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+        await createTestYamlFile(tempDir, "base.yaml", baseYaml);
+        await createTestYamlFile(tempDir, "overrides.yaml", overridesYaml);
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 3, c: 4 },
+        });
+      });
+
+      it("should merge a !reference-all result with internal flattening", async () => {
+        const aYaml = `
+          a_key: a_value
+        `;
+
+        const bYaml = `
+          b_key: b_value
+        `;
+
+        const mainYaml = `
+          result: !merge
+            - { base: true }
+            - !reference-all { glob: "overrides/*.yaml" }
+        `;
+
+        const overridesDir = `${tempDir}/overrides`;
+        await fs.mkdir(overridesDir, { recursive: true });
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+        await createTestYamlFile(overridesDir, "a.yaml", aYaml);
+        await createTestYamlFile(overridesDir, "b.yaml", bYaml);
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a_key: "a_value", b_key: "b_value", base: true },
+        });
+      });
+
+      it("should merge a !reference-all whose files contain overlapping keys with last-write-wins", async () => {
+        const baseYaml = `
+          host: localhost
+          port: 3000
+        `;
+
+        const prodYaml = `
+          host: prod.example.com
+          tls: true
+        `;
+
+        const mainYaml = `
+          config: !merge
+            - !reference-all { glob: "layers/*.yaml" }
+        `;
+
+        const layersDir = `${tempDir}/layers`;
+        await fs.mkdir(layersDir, { recursive: true });
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+        await createTestYamlFile(layersDir, "base.yaml", baseYaml);
+        await createTestYamlFile(layersDir, "prod.yaml", prodYaml);
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          config: { host: "prod.example.com", port: 3000, tls: true },
+        });
+      });
+
+      it("should throw error when null is a top-level item in the merge sequence", async () => {
+        const mainYaml = `
+          result: !merge
+            - null
+            - { a: 1 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+          /!merge: all items must be objects after flattening/,
+        );
+      });
+    });
+
     it("should resolve simple reference", async () => {
       const mainYaml = `
         database: !reference

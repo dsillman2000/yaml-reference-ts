@@ -7,6 +7,7 @@ import { Document, parse, Tags, YAMLMap, YAMLSeq } from "yaml";
 import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
+import { Merge } from "./Merge";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
@@ -91,12 +92,41 @@ const illegalFlattenOnMapping = {
   },
 };
 
+/**
+ * Custom tag for !merge
+ */
+const mergeTag = {
+  identify: (value: any) => value instanceof Merge,
+  tag: "!merge",
+  collection: "seq" as const,
+  resolve: (value: YAMLSeq, _: (message: string) => void) => {
+    const sequence = new Document(value, {
+      customTags: customTags,
+    }).toJS();
+    return new Merge(sequence);
+  },
+};
+
+/**
+ * Dummy illegal flag when merge is used on a mapping.
+ */
+const illegalMergeOnMapping = {
+  identify: (value: any) => value instanceof Merge,
+  tag: "!merge",
+  collection: "map" as const,
+  resolve: (_: any, onError: (message: string) => void) => {
+    return onError("!merge tag cannot be used on a mapping");
+  },
+};
+
 // Custom tags array for parsing
 const customTags: Tags = [
   referenceTag,
   referenceAllTag,
   flattenTag,
   illegalFlattenOnMapping,
+  mergeTag,
+  illegalMergeOnMapping,
 ];
 
 /**
@@ -164,6 +194,13 @@ function processParsedDocument(obj: any, filePath: string): any {
       processParsedDocument(item, filePath),
     );
     return new Flatten(processed);
+  }
+
+  if (obj instanceof Merge) {
+    let processed = obj.sequence.map((item) =>
+      processParsedDocument(item, filePath),
+    );
+    return new Merge(processed);
   }
 
   if (Array.isArray(obj)) {
