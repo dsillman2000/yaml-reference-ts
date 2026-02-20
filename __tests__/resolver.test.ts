@@ -1019,5 +1019,64 @@ describe("Resolver", () => {
         loadYamlWithReferencesSync(`${tempDir}/nonexistent.yaml`);
       }).toThrow(/ENOENT|no such file or directory|Failed to parse YAML file/);
     });
+
+    it("should resolve !flatten synchronously", async () => {
+      const mainYaml = `
+        data: !flatten
+          - 1
+          -
+            - 2
+            - 3
+      `;
+
+      const mainPath = await createTestYamlFile(tempDir, "main.yaml", mainYaml);
+
+      const result = loadYamlWithReferencesSync(mainPath);
+
+      expect(result).toEqual({
+        data: [1, 2, 3],
+      });
+    });
+
+    it("should resolve !merge synchronously", async () => {
+      const mainYaml = `
+        config: !merge
+          - host: localhost
+            port: 3000
+          - host: prod.example.com
+            tls: true
+      `;
+
+      const mainPath = await createTestYamlFile(tempDir, "main.yaml", mainYaml);
+
+      const result = loadYamlWithReferencesSync(mainPath);
+
+      expect(result).toEqual({
+        config: { host: "prod.example.com", port: 3000, tls: true },
+      });
+    });
+
+    it("should resolve !merge with !reference synchronously", async () => {
+      const mainYaml = `
+        config: !merge
+          - !reference
+            path: base.yaml
+          - host: prod.example.com
+      `;
+
+      const baseYaml = `
+        host: localhost
+        port: 3000
+      `;
+
+      const mainPath = await createTestYamlFile(tempDir, "main.yaml", mainYaml);
+      await createTestYamlFile(tempDir, "base.yaml", baseYaml);
+
+      const result = loadYamlWithReferencesSync(mainPath);
+
+      expect(result).toEqual({
+        config: { host: "prod.example.com", port: 3000 },
+      });
+    });
   });
 });

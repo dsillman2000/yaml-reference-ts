@@ -72,7 +72,7 @@ const mergeTag = {
   collection: "seq" as const,
   resolve: (value: YAMLSeq, _: (message: string) => void) => {
     const sequence = new Document(value, {
-      customTags: customTags,
+      customTags,
     }).toJS();
     return new Merge(sequence);
   },
@@ -99,7 +99,7 @@ const flattenTag = {
   collection: "seq" as const,
   resolve: (value: YAMLSeq, _: (message: string) => void) => {
     const sequence = new Document(value, {
-      customTags: customTags,
+      customTags,
     }).toJS();
     return new Flatten(sequence);
   },
@@ -188,14 +188,14 @@ function processParsedDocument(obj: any, filePath: string): any {
   }
 
   if (obj instanceof Flatten) {
-    let processed = obj.sequence.map((item) =>
+    const processed = obj.sequence.map((item) =>
       processParsedDocument(item, filePath),
     );
     return new Flatten(processed);
   }
 
   if (obj instanceof Merge) {
-    let processed = obj.sequence.map((item) =>
+    const processed = obj.sequence.map((item) =>
       processParsedDocument(item, filePath),
     );
     return new Merge(processed);
