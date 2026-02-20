@@ -13,7 +13,6 @@ export class Flatten {
   /**
    * Creates a new Flatten instance
    * @param sequence - The sequence to be flattened
-   * @param location - Absolute path to the file containing this flatten tag (optional, will be set later)
    */
   constructor(sequence: any[]) {
     this.sequence = sequence;

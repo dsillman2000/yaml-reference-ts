@@ -63,35 +63,6 @@ const referenceAllTag = {
   },
 };
 
-const referentialTags: Tags = [referenceTag, referenceAllTag];
-
-/**
- * Custom tag for !flatten
- */
-const flattenTag = {
-  identify: (value: any) => value instanceof Flatten,
-  tag: "!flatten",
-  collection: "seq" as const,
-  resolve: (value: YAMLSeq, _: (message: string) => void) => {
-    const sequence = new Document(value, {
-      customTags: referentialTags,
-    }).toJS();
-    return new Flatten(sequence);
-  },
-};
-
-/**
- * Dummy illegal flag when flatten is used on a mapping.
- */
-const illegalFlattenOnMapping = {
-  identify: (value: any) => value instanceof Flatten,
-  tag: "!flatten",
-  collection: "map" as const,
-  resolve: (_: any, onError: (message: string) => void) => {
-    return onError("!flatten tag cannot be used on a mapping");
-  },
-};
-
 /**
  * Custom tag for !merge
  */
@@ -116,6 +87,33 @@ const illegalMergeOnMapping = {
   collection: "map" as const,
   resolve: (_: any, onError: (message: string) => void) => {
     return onError("!merge tag cannot be used on a mapping");
+  },
+};
+
+/**
+ * Custom tag for !flatten
+ */
+const flattenTag = {
+  identify: (value: any) => value instanceof Flatten,
+  tag: "!flatten",
+  collection: "seq" as const,
+  resolve: (value: YAMLSeq, _: (message: string) => void) => {
+    const sequence = new Document(value, {
+      customTags: customTags,
+    }).toJS();
+    return new Flatten(sequence);
+  },
+};
+
+/**
+ * Dummy illegal flag when flatten is used on a mapping.
+ */
+const illegalFlattenOnMapping = {
+  identify: (value: any) => value instanceof Flatten,
+  tag: "!flatten",
+  collection: "map" as const,
+  resolve: (_: any, onError: (message: string) => void) => {
+    return onError("!flatten tag cannot be used on a mapping");
   },
 };
 

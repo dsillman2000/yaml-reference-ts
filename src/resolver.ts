@@ -58,14 +58,17 @@ function normalizeAllowPaths(
 
 /**
  * Recursively flatten an array, spreading nested arrays and processing
- * any Flatten/Merge instances found within. Only used by !flatten and !merge handlers.
+ * any Flatten/Merge instances found within. Helper function used by !flatten
+ * and !merge handlers.
  * @param arr - Array to deeply flatten
  * @returns Flat array with all nested arrays expanded
  */
 function flattenArray(arr: any[]): any[] {
   const result: any[] = [];
   for (const item of arr) {
-    const processed = flattenSequences(item);
+    // pre-process the item to resolve any nested transforming tags (!flatten,
+    // !merge) before flattening the result
+    const processed = resolveTransformTagsRecursive(item);
     if (Array.isArray(processed)) {
       result.push(...flattenArray(processed));
     } else {
@@ -76,57 +79,74 @@ function flattenArray(arr: any[]): any[] {
 }
 
 /**
- * Recursively process an object tree, resolving Flatten and Merge instances.
- * Plain arrays are traversed but NOT flattened — only !flatten-tagged sequences
- * are flattened.
+ * Resolves a !merge tag by merging the sequence of objects it contains.
+ * @param obj - Merge instance containing the sequence to merge
+ * @returns Merged object
+ * @throws Error if any item in the sequence is not an object after flattening
+ */
+function resolveMerge(obj: Merge): any {
+  // Flatten nested arrays (only within this merge context)
+  const flattened = flattenArray(obj.sequence);
+  // Validate all items are objects (not null, not array, not scalar)
+  for (let i = 0; i < flattened.length; i++) {
+    const item = flattened[i];
+    if (
+      item === null ||
+      item === undefined ||
+      typeof item !== "object" ||
+      Array.isArray(item)
+    ) {
+      const itemType =
+        item === null ? "null" : Array.isArray(item) ? "array" : typeof item;
+      throw new Error(
+        `!merge: all items must be objects after flattening, but found ${itemType} at index ${i}`,
+      );
+    }
+  }
+  // Spread-merge with last-write-wins
+  return Object.assign({}, ...flattened);
+}
+
+/**
+ * Resolves a !flatten tag by flattening the sequence it contains.
+ * @param obj - Flatten instance containing the sequence to flatten
+ * @returns Flattened array
+ */
+function resolveFlatten(obj: Flatten): any {
+  // Flatten the sequence inside the Flatten object
+  return flattenArray(obj.sequence);
+}
+
+/**
+ * Recursively process an object tree, resolving tags that transform data - such
+ * as !flatten and !merge tags.
+ *
+ * @precondition - all references have already been resolved, so the tree should
+ * not contain any Reference or ReferenceAll instances. The only tags remaining
+ * should be !flatten or !merge tags
+ *
  * @param obj - Object that may contain Flatten or Merge instances
  * @returns Object with all Flatten/Merge instances resolved
  */
-export function flattenSequences(obj: any): any {
+export function resolveTransformTagsRecursive(obj: any): any {
+  // If we are in a sequence, continue recursion until we reach a leaf node
   if (Array.isArray(obj)) {
-    return obj.map((item) => flattenSequences(item));
+    return obj.map((item) => resolveTransformTagsRecursive(item));
   }
 
+  // On leaf nodes, check for tags, or traverse objects
   if (obj && typeof obj === "object") {
     if (obj instanceof Flatten) {
-      // Flatten the sequence inside the Flatten object
-      return flattenArray(obj.sequence);
+      return resolveFlatten(obj);
     }
-
     if (obj instanceof Merge) {
-      // First, recursively apply flattenSequences to each item
-      const processedItems = obj.sequence.map((item: any) =>
-        flattenSequences(item),
-      );
-      // Flatten nested arrays (only within this merge context)
-      const flattened = flattenArray(processedItems);
-      // Validate all items are objects (not null, not array, not scalar)
-      for (let i = 0; i < flattened.length; i++) {
-        const item = flattened[i];
-        if (
-          item === null ||
-          item === undefined ||
-          typeof item !== "object" ||
-          Array.isArray(item)
-        ) {
-          const itemType =
-            item === null
-              ? "null"
-              : Array.isArray(item)
-                ? "array"
-                : typeof item;
-          throw new Error(
-            `!merge: all items must be objects after flattening, but found ${itemType} at index ${i}`,
-          );
-        }
-      }
-      // Spread-merge with last-write-wins
-      return Object.assign({}, ...flattened);
+      return resolveMerge(obj);
     }
 
+    // Not one of our tags, but still an object - continue recursion
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = flattenSequences(value);
+      result[key] = resolveTransformTagsRecursive(value);
     }
     return result;
   }
@@ -151,7 +171,7 @@ export async function loadAndResolve(
     new Set<string>(),
     normalizedAllowPaths,
   );
-  return flattenSequences(resolved);
+  return resolveTransformTagsRecursive(resolved);
 }
 
 /**
@@ -171,7 +191,7 @@ export function loadAndResolveSync(
     new Set<string>(),
     normalizedAllowPaths,
   );
-  return flattenSequences(resolved);
+  return resolveTransformTagsRecursive(resolved);
 }
 
 /**
