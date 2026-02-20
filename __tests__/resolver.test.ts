@@ -496,6 +496,41 @@ describe("Resolver", () => {
         loadYamlWithReferences(mainPath, [allowedDir]),
       ).rejects.toThrow(/is not allowed/);
     });
+
+    it("should reject references that use a symlink to escape allowed paths", async () => {
+      const allowedDir = `${tempDir}/allowed`;
+      const secretDir = `${tempDir}/secret`;
+      await fs.mkdir(allowedDir, { recursive: true });
+      await fs.mkdir(secretDir, { recursive: true });
+
+      // Create a sensitive file outside the allowed directory
+      const secretYaml = `
+        password: super-secret
+      `;
+      await createTestYamlFile(secretDir, "credentials.yaml", secretYaml);
+
+      // Create a symlink inside the allowed directory that points outside it
+      await fs.symlink(
+        `${secretDir}/credentials.yaml`,
+        `${allowedDir}/sneaky-link.yaml`,
+      );
+
+      const mainYaml = `
+        stolen: !reference
+          path: sneaky-link.yaml
+      `;
+
+      const mainPath = await createTestYamlFile(
+        allowedDir,
+        "main.yaml",
+        mainYaml,
+      );
+
+      // The symlink lives inside allowedDir, but its real path is in secretDir
+      await expect(
+        loadYamlWithReferences(mainPath, [allowedDir]),
+      ).rejects.toThrow(/is not allowed/);
+    });
   });
 
   describe("loadYamlWithReferencesSync", () => {
