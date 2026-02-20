@@ -468,6 +468,34 @@ describe("Resolver", () => {
         },
       });
     });
+
+    it("should reject references where allowedPath is a prefix but not a path boundary", async () => {
+      // e.g. allowedPath = "/tmp/allowed", target = "/tmp/allowed-but-not-really/evil.yaml"
+      // This should be rejected because "allowed-but-not-really" is not a child of "allowed"
+      const allowedDir = `${tempDir}/allowed`;
+      const sneakyDir = `${tempDir}/allowed-but-not-really`;
+      const subDir = `${tempDir}/allowed/sub`;
+      await fs.mkdir(allowedDir, { recursive: true });
+      await fs.mkdir(sneakyDir, { recursive: true });
+      await fs.mkdir(subDir, { recursive: true });
+
+      const mainYaml = `
+        evil: !reference
+          path: ../../allowed-but-not-really/evil.yaml
+      `;
+
+      const evilYaml = `
+        data: gotcha
+      `;
+
+      const mainPath = await createTestYamlFile(subDir, "main.yaml", mainYaml);
+      await createTestYamlFile(sneakyDir, "evil.yaml", evilYaml);
+
+      // allowPaths only includes "allowed", not "allowed-but-not-really"
+      await expect(
+        loadYamlWithReferences(mainPath, [allowedDir]),
+      ).rejects.toThrow(/is not allowed/);
+    });
   });
 
   describe("loadYamlWithReferencesSync", () => {

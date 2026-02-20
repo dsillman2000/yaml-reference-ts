@@ -13,6 +13,17 @@ import { Flatten } from "./Flatten";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
 
 /**
+ * Check if childPath is equal to or nested within parentPath,
+ * ensuring a proper path boundary to prevent traversal bypasses.
+ */
+function isSubPath(childPath: string, parentPath: string): boolean {
+  return (
+    childPath === parentPath ||
+    childPath.startsWith(parentPath + path.sep)
+  );
+}
+
+/**
  * Normalize allowPaths to always include the parent directory of filePath
  */
 function normalizeAllowPaths(
@@ -266,7 +277,7 @@ async function resolveReference(
   // Check if path is allowed
   if (allowPaths && allowPaths.length > 0) {
     const isAllowed = allowPaths.some((allowedPath) => {
-      return realTargetPath.startsWith(allowedPath);
+      return isSubPath(realTargetPath, allowedPath);
     });
 
     if (!isAllowed) {
@@ -330,7 +341,7 @@ function resolveReferenceSync(
   // Check if path is allowed
   if (allowPaths && allowPaths.length > 0) {
     const isAllowed = allowPaths.some((allowedPath) => {
-      return realTargetPath.startsWith(allowedPath);
+      return isSubPath(realTargetPath, allowedPath);
     });
 
     if (!isAllowed) {
@@ -410,7 +421,7 @@ async function resolveReferenceAll(
   let filteredFiles = realMatchingFiles;
   if (allowPaths && allowPaths.length > 0) {
     filteredFiles = realMatchingFiles.filter((realPath) => {
-      return allowPaths.some((allowedPath) => realPath.startsWith(allowedPath));
+      return allowPaths.some((allowedPath) => isSubPath(realPath, allowedPath));
     });
   }
 
@@ -503,7 +514,7 @@ function resolveReferenceAllSync(
   if (allowPaths && allowPaths.length > 0) {
     filteredFiles = realMatchingFiles.filter((realPath) => {
       return allowPaths.some((allowedPath) => {
-        return realPath.startsWith(allowedPath);
+        return isSubPath(realPath, allowedPath);
       });
     });
   }
