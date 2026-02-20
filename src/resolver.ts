@@ -18,8 +18,7 @@ import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
  */
 function isSubPath(childPath: string, parentPath: string): boolean {
   return (
-    childPath === parentPath ||
-    childPath.startsWith(parentPath + path.sep)
+    childPath === parentPath || childPath.startsWith(parentPath + path.sep)
   );
 }
 
@@ -31,13 +30,13 @@ function normalizeAllowPaths(
   allowPaths?: string[],
 ): string[] {
   const parentDir = path.dirname(path.resolve(filePath));
-  const normalizedPaths: string[] = [];
+  const seen = new Set<string>();
 
   // Add parent directory first
   try {
-    normalizedPaths.push(fsSync.realpathSync(parentDir));
+    seen.add(fsSync.realpathSync(parentDir));
   } catch {
-    normalizedPaths.push(parentDir);
+    seen.add(parentDir);
   }
 
   // Add any provided allowPaths that aren't already included
@@ -49,13 +48,11 @@ function normalizeAllowPaths(
       } catch {
         resolvedAllowedPath = path.resolve(allowedPath);
       }
-      if (!normalizedPaths.includes(resolvedAllowedPath)) {
-        normalizedPaths.push(resolvedAllowedPath);
-      }
+      seen.add(resolvedAllowedPath);
     }
   }
 
-  return normalizedPaths;
+  return Array.from(seen);
 }
 
 /**
