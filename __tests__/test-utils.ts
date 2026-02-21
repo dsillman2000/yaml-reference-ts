@@ -2,15 +2,18 @@
  * Test utilities for yaml-reference-ts
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { tmpdir } from 'os';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { tmpdir } from "os";
 
 /**
  * Create a temporary directory for tests
  */
 export async function createTempDir(): Promise<string> {
-  const tempDir = path.join(tmpdir(), `yaml-ref-test-${Date.now()}-${Math.random().toString(36).substring(2)}`);
+  const tempDir = path.join(
+    tmpdir(),
+    `yaml-ref-test-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+  );
   await fs.mkdir(tempDir, { recursive: true });
   return tempDir;
 }
@@ -18,9 +21,13 @@ export async function createTempDir(): Promise<string> {
 /**
  * Create a test YAML file in the specified directory
  */
-export async function createTestYamlFile(dir: string, filename: string, content: string): Promise<string> {
+export async function createTestYamlFile(
+  dir: string,
+  filename: string,
+  content: string,
+): Promise<string> {
   const filePath = path.join(dir, filename);
-  await fs.writeFile(filePath, content, 'utf-8');
+  await fs.writeFile(filePath, content, "utf-8");
   return filePath;
 }
 
@@ -53,14 +60,16 @@ export function createMockFileSystem(files: MockFile[]): {
   mkdir: jest.Mock;
   rm: jest.Mock;
 } {
-  const fileMap = new Map(files.map(f => [path.resolve(f.path), f.content]));
+  const fileMap = new Map(files.map((f) => [path.resolve(f.path), f.content]));
 
   return {
     readFile: jest.fn(async (filePath: string) => {
       const resolvedPath = path.resolve(filePath);
       const content = fileMap.get(resolvedPath);
       if (content === undefined) {
-        throw new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+        throw new Error(
+          `ENOENT: no such file or directory, open '${filePath}'`,
+        );
       }
       return content;
     }),
@@ -69,7 +78,9 @@ export function createMockFileSystem(files: MockFile[]): {
       const resolvedPath = path.resolve(filePath);
       const content = fileMap.get(resolvedPath);
       if (content === undefined) {
-        throw new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+        throw new Error(
+          `ENOENT: no such file or directory, open '${filePath}'`,
+        );
       }
       return content;
     }),
@@ -77,12 +88,14 @@ export function createMockFileSystem(files: MockFile[]): {
     access: jest.fn(async (filePath: string) => {
       const resolvedPath = path.resolve(filePath);
       if (!fileMap.has(resolvedPath)) {
-        throw new Error(`ENOENT: no such file or directory, access '${filePath}'`);
+        throw new Error(
+          `ENOENT: no such file or directory, access '${filePath}'`,
+        );
       }
     }),
 
     mkdir: jest.fn(async () => undefined),
-    rm: jest.fn(async () => undefined)
+    rm: jest.fn(async () => undefined),
   };
 }
 
@@ -90,12 +103,14 @@ export function createMockFileSystem(files: MockFile[]): {
  * Assert that two objects are deeply equal, ignoring key order
  */
 export function expectDeepEqual(actual: any, expected: any): void {
-  expect(JSON.parse(JSON.stringify(actual))).toEqual(JSON.parse(JSON.stringify(expected)));
+  expect(JSON.parse(JSON.stringify(actual))).toEqual(
+    JSON.parse(JSON.stringify(expected)),
+  );
 }
 
 /**
  * Wait for a specified time (useful for async tests)
  */
 export function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

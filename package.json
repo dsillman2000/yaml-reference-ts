@@ -1,56 +1,59 @@
 {
-    "name": "@dsillman2000/yaml-reference-ts",
-    "version": "1.2.0",
-    "description": "A Node.js TypeScript library for resolving YAML documents containing !reference and !reference-all tags",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/dsillman2000/yaml-reference-ts"
-    },
-    "homepage": "https://github.com/dsillman2000/yaml-reference-ts#readme",
-    "bugs": {
-        "url": "https://github.com/dsillman2000/yaml-reference-ts/issues"
-    },
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "bin": {
-        "yaml-reference-cli": "./dist/cli/index.js"
-    },
-    "scripts": {
-        "build": "tsc",
-        "dev": "tsc --watch",
-        "test": "jest",
-        "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage",
-        "lint": "eslint --config .eslintrc.js src/**/*.ts",
-        "prepublishOnly": "npm run build",
-        "prepare": "npm run build"
-    },
-    "keywords": [
-        "yaml",
-        "reference",
-        "resolver",
-        "configuration",
-        "typescript"
-    ],
-    "author": "David Sillman <dsillman2000@gmail.com>",
-    "license": "MIT",
-    "dependencies": {
-        "glob": "^13.0.1",
-        "yaml": "^2.8.2"
-    },
-    "devDependencies": {
-        "@types/glob": "^8.1.0",
-        "@types/jest": "^30.0.0",
-        "@types/node": "^25.2.2",
-        "@typescript-eslint/eslint-plugin": "^8.54.0",
-        "@typescript-eslint/parser": "^8.54.0",
-        "eslint": "^9.39.2",
-        "jest": "^30.2.0",
-        "ts-jest": "^29.4.6",
-        "typescript": "^5.9.3"
-    },
-    "files": [
-        "dist",
-        "README.md"
-    ]
+  "name": "@dsillman2000/yaml-reference-ts",
+  "version": "1.2.0",
+  "description": "A Node.js TypeScript library for resolving YAML documents containing !reference and !reference-all tags",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dsillman2000/yaml-reference-ts"
+  },
+  "homepage": "https://github.com/dsillman2000/yaml-reference-ts#readme",
+  "bugs": {
+    "url": "https://github.com/dsillman2000/yaml-reference-ts/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "yaml-reference-cli": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --config .eslintrc.js src/**/*.ts",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "yaml",
+    "reference",
+    "resolver",
+    "configuration",
+    "typescript"
+  ],
+  "author": "David Sillman <dsillman2000@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "glob": "^13.0.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.2",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "jest": "^30.2.0",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }

@@ -1,15 +1,15 @@
 {
-    "lsp": {
-        "yaml-language-server": {
-            "settings": {
-                "yaml": {
-                    "customTags": [
-                        "!reference mapping",
-                        "!reference-all mapping",
-                        "!flatten sequence"
-                    ]
-                }
-            }
+  "lsp": {
+    "yaml-language-server": {
+      "settings": {
+        "yaml": {
+          "customTags": [
+            "!reference mapping",
+            "!reference-all mapping",
+            "!flatten sequence"
+          ]
         }
+      }
     }
+  }
 }
