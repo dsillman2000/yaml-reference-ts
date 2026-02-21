@@ -13,6 +13,16 @@ import { Flatten } from "./Flatten";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
 
 /**
+ * Check if childPath is equal to or nested within parentPath,
+ * ensuring a proper path boundary to prevent traversal bypasses.
+ */
+function isSubPath(childPath: string, parentPath: string): boolean {
+  return (
+    childPath === parentPath || childPath.startsWith(parentPath + path.sep)
+  );
+}
+
+/**
  * Normalize allowPaths to always include the parent directory of filePath
  */
 function normalizeAllowPaths(
@@ -20,22 +30,29 @@ function normalizeAllowPaths(
   allowPaths?: string[],
 ): string[] {
   const parentDir = path.dirname(path.resolve(filePath));
-  const normalizedPaths: string[] = [];
+  const seen = new Set<string>();
 
   // Add parent directory first
-  normalizedPaths.push(parentDir);
+  try {
+    seen.add(fsSync.realpathSync(parentDir));
+  } catch {
+    seen.add(parentDir);
+  }
 
   // Add any provided allowPaths that aren't already included
   if (allowPaths && allowPaths.length > 0) {
     for (const allowedPath of allowPaths) {
-      const resolvedAllowedPath = path.resolve(allowedPath);
-      if (!normalizedPaths.includes(resolvedAllowedPath)) {
-        normalizedPaths.push(resolvedAllowedPath);
+      let resolvedAllowedPath: string;
+      try {
+        resolvedAllowedPath = fsSync.realpathSync(allowedPath);
+      } catch {
+        resolvedAllowedPath = path.resolve(allowedPath);
       }
+      seen.add(resolvedAllowedPath);
     }
   }
 
-  return normalizedPaths;
+  return Array.from(seen);
 }
 
 /**
@@ -245,12 +262,19 @@ async function resolveReference(
   const refDir = path.dirname(ref._location);
   const targetPath = path.resolve(refDir, ref.path);
 
+  let realTargetPath: string;
+  try {
+    realTargetPath = await fs.realpath(targetPath);
+  } catch (error) {
+    throw new Error(
+      `Referenced file not found: ${targetPath} (from ${ref._location})`,
+    );
+  }
+
   // Check if path is allowed
   if (allowPaths && allowPaths.length > 0) {
     const isAllowed = allowPaths.some((allowedPath) => {
-      const resolvedAllowedPath = path.resolve(allowedPath);
-      const resolvedTargetPath = path.resolve(targetPath);
-      return resolvedTargetPath.startsWith(resolvedAllowedPath);
+      return isSubPath(realTargetPath, allowedPath);
     });
 
     if (!isAllowed) {
@@ -261,36 +285,23 @@ async function resolveReference(
   }
 
   // Check for circular references
-  if (visitedPaths.has(targetPath)) {
+  if (visitedPaths.has(realTargetPath)) {
     throw new Error(
-      `Circular reference detected: ${targetPath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
+      `Circular reference detected: ${realTargetPath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
     );
   }
 
-  // Add to visited paths
-  visitedPaths.add(targetPath);
+  visitedPaths.add(realTargetPath);
 
-  try {
-    // Check if file exists
-    await fs.access(targetPath);
-  } catch (error) {
-    throw new Error(
-      `Referenced file not found: ${targetPath} (from ${ref._location})`,
-    );
-  }
+  const parsed = await parseYamlWithReferences(realTargetPath);
 
-  // Load and parse the referenced file
-  const parsed = await parseYamlWithReferences(targetPath);
-
-  // Recursively resolve references in the parsed content
   const resolved = await _recursivelyResolveReferences(
     parsed,
     visitedPaths,
     allowPaths,
   );
 
-  // Remove from visited paths after resolution
-  visitedPaths.delete(targetPath);
+  visitedPaths.delete(realTargetPath);
 
   return resolved;
 }
@@ -315,12 +326,19 @@ function resolveReferenceSync(
   const refDir = path.dirname(ref._location);
   const targetPath = path.resolve(refDir, ref.path);
 
+  let realTargetPath: string;
+  try {
+    realTargetPath = fsSync.realpathSync(targetPath);
+  } catch (error) {
+    throw new Error(
+      `Referenced file not found: ${targetPath} (from ${ref._location})`,
+    );
+  }
+
   // Check if path is allowed
   if (allowPaths && allowPaths.length > 0) {
     const isAllowed = allowPaths.some((allowedPath) => {
-      const resolvedAllowedPath = path.resolve(allowedPath);
-      const resolvedTargetPath = path.resolve(targetPath);
-      return resolvedTargetPath.startsWith(resolvedAllowedPath);
+      return isSubPath(realTargetPath, allowedPath);
     });
 
     if (!isAllowed) {
@@ -331,36 +349,23 @@ function resolveReferenceSync(
   }
 
   // Check for circular references
-  if (visitedPaths.has(targetPath)) {
+  if (visitedPaths.has(realTargetPath)) {
     throw new Error(
-      `Circular reference detected: ${targetPath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
+      `Circular reference detected: ${realTargetPath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
     );
   }
 
-  // Add to visited paths
-  visitedPaths.add(targetPath);
+  visitedPaths.add(realTargetPath);
 
-  try {
-    // Check if file exists
-    fsSync.accessSync(targetPath);
-  } catch (error) {
-    throw new Error(
-      `Referenced file not found: ${targetPath} (from ${ref._location})`,
-    );
-  }
+  const parsed = parseYamlWithReferencesSync(realTargetPath);
 
-  // Load and parse the referenced file
-  const parsed = parseYamlWithReferencesSync(targetPath);
-
-  // Recursively resolve references in the parsed content
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
     visitedPaths,
     allowPaths,
   );
 
-  // Remove from visited paths after resolution
-  visitedPaths.delete(targetPath);
+  visitedPaths.delete(realTargetPath);
 
   return resolved;
 }
@@ -400,30 +405,35 @@ async function resolveReferenceAll(
     (file) => file.endsWith(".yaml") || file.endsWith(".yml"),
   );
 
-  // Filter by allowed paths if specified
+  const realMatchingFiles: string[] = [];
+  for (const filePath of matchingFiles) {
+    try {
+      realMatchingFiles.push(await fs.realpath(filePath));
+    } catch {
+      // Skip broken symlinks
+    }
+  }
+
+  // Filter by allowed paths
+  let filteredFiles = realMatchingFiles;
   if (allowPaths && allowPaths.length > 0) {
-    matchingFiles = matchingFiles.filter((filePath) => {
-      const resolvedFilePath = path.resolve(filePath);
-      return allowPaths.some((allowedPath) => {
-        const resolvedAllowedPath = path.resolve(allowedPath);
-        return resolvedFilePath.startsWith(resolvedAllowedPath);
-      });
+    filteredFiles = realMatchingFiles.filter((realPath) => {
+      return allowPaths.some((allowedPath) => isSubPath(realPath, allowedPath));
     });
   }
 
-  if (matchingFiles.length === 0) {
+  if (filteredFiles.length === 0) {
     throw new Error(
       `No YAML files found matching glob pattern: ${globPattern} (from ${refAll._location})`,
     );
   }
 
   // Sort files alphabetically for consistent ordering
-  matchingFiles.sort();
+  filteredFiles.sort();
 
   // Resolve each matching file
   const resolvedContents: any[] = [];
-  for (const filePath of matchingFiles) {
-    // Check for circular references
+  for (const filePath of filteredFiles) {
     if (visitedPaths.has(filePath)) {
       throw new Error(
         `Circular reference detected: ${filePath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
@@ -433,10 +443,8 @@ async function resolveReferenceAll(
     visitedPaths.add(filePath);
 
     try {
-      // Load and parse the file
       const parsed = await parseYamlWithReferences(filePath);
 
-      // Recursively resolve references
       const resolved = await _recursivelyResolveReferences(
         parsed,
         visitedPaths,
@@ -444,7 +452,6 @@ async function resolveReferenceAll(
       );
       resolvedContents.push(resolved);
     } catch (error) {
-      // Remove from visited paths on error
       visitedPaths.delete(filePath);
       throw error;
     }
@@ -490,30 +497,37 @@ function resolveReferenceAllSync(
     (file) => file.endsWith(".yaml") || file.endsWith(".yml"),
   );
 
-  // Filter by allowed paths if specified
+  const realMatchingFiles: string[] = [];
+  for (const filePath of matchingFiles) {
+    try {
+      realMatchingFiles.push(fsSync.realpathSync(filePath));
+    } catch {
+      // Skip broken symlinks
+    }
+  }
+
+  // Filter by allowed paths
+  let filteredFiles = realMatchingFiles;
   if (allowPaths && allowPaths.length > 0) {
-    matchingFiles = matchingFiles.filter((filePath) => {
-      const resolvedFilePath = path.resolve(filePath);
+    filteredFiles = realMatchingFiles.filter((realPath) => {
       return allowPaths.some((allowedPath) => {
-        const resolvedAllowedPath = path.resolve(allowedPath);
-        return resolvedFilePath.startsWith(resolvedAllowedPath);
+        return isSubPath(realPath, allowedPath);
       });
     });
   }
 
-  if (matchingFiles.length === 0) {
+  if (filteredFiles.length === 0) {
     throw new Error(
       `No YAML files found matching glob pattern: ${globPattern} (from ${refAll._location})`,
     );
   }
 
   // Sort files alphabetically for consistent ordering
-  matchingFiles.sort();
+  filteredFiles.sort();
 
   // Resolve each matching file
   const resolvedContents: any[] = [];
-  for (const filePath of matchingFiles) {
-    // Check for circular references
+  for (const filePath of filteredFiles) {
     if (visitedPaths.has(filePath)) {
       throw new Error(
         `Circular reference detected: ${filePath} (visited: ${Array.from(visitedPaths).join(" -> ")})`,
@@ -523,10 +537,8 @@ function resolveReferenceAllSync(
     visitedPaths.add(filePath);
 
     try {
-      // Load and parse the file
       const parsed = parseYamlWithReferencesSync(filePath);
 
-      // Recursively resolve references
       const resolved = _recursivelyResolveReferencesSync(
         parsed,
         visitedPaths,
@@ -534,7 +546,6 @@ function resolveReferenceAllSync(
       );
       resolvedContents.push(resolved);
     } catch (error) {
-      // Remove from visited paths on error
       visitedPaths.delete(filePath);
       throw error;
     }
