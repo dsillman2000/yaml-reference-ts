@@ -3,7 +3,7 @@
  * Uses the eemeli/yaml package to parse YAML with custom tags
  */
 
-import { Document, parse, Tags, YAMLMap, YAMLSeq } from "yaml";
+import { Document, parseDocument, Tags, YAMLMap, YAMLSeq } from "yaml";
 import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
@@ -71,10 +71,9 @@ const mergeTag = {
   tag: "!merge",
   collection: "seq" as const,
   resolve: (value: YAMLSeq, _: (message: string) => void) => {
-    const sequence = new Document(value, {
-      customTags,
-    }).toJS();
-    return new Merge(sequence);
+    // Store the raw YAMLSeq node; it will be converted to JS later via
+    // resolveRawNodes once the full Document (with its anchor map) is available.
+    return new Merge(value as any);
   },
 };
 
@@ -98,10 +97,9 @@ const flattenTag = {
   tag: "!flatten",
   collection: "seq" as const,
   resolve: (value: YAMLSeq, _: (message: string) => void) => {
-    const sequence = new Document(value, {
-      customTags,
-    }).toJS();
-    return new Flatten(sequence);
+    // Store the raw YAMLSeq node; it will be converted to JS later via
+    // resolveRawNodes once the full Document (with its anchor map) is available.
+    return new Flatten(value as any);
   },
 };
 
@@ -136,10 +134,18 @@ export function parseYamlWithReferencesSync(filePath: string): any {
   try {
     const absolutePath = path.resolve(filePath);
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    const parsed = parse(content, { customTags: customTags });
+    const doc = parseDocument(content, { customTags: customTags });
+    if (doc.errors.length > 0) {
+      throw doc.errors[0];
+    }
+    const parsed = doc.toJS();
+
+    // Convert any raw YAMLSeq nodes stored in Flatten/Merge to JS arrays,
+    // using the original document so that anchors & aliases resolve correctly.
+    const resolved = resolveRawNodes(parsed, doc);
 
     // Process the parsed document to set _location on Reference and ReferenceAll objects
-    return processParsedDocument(parsed, filePath);
+    return processParsedDocument(resolved, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -159,10 +165,18 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
   try {
     const absolutePath = path.resolve(filePath);
     const content = await fs.readFile(absolutePath, "utf8");
-    const parsed = parse(content, { customTags: customTags });
+    const doc = parseDocument(content, { customTags: customTags });
+    if (doc.errors.length > 0) {
+      throw doc.errors[0];
+    }
+    const parsed = doc.toJS();
+
+    // Convert any raw YAMLSeq nodes stored in Flatten/Merge to JS arrays,
+    // using the original document so that anchors & aliases resolve correctly.
+    const resolved = resolveRawNodes(parsed, doc);
 
     // Process the parsed document to set _location on Reference and ReferenceAll objects
-    return processParsedDocument(parsed, filePath);
+    return processParsedDocument(resolved, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -171,6 +185,54 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
       }`,
     );
   }
+}
+
+/**
+ * Recursively walk the parsed JS tree and convert any raw YAMLSeq nodes
+ * (stored in Flatten/Merge instances during the compose phase) into plain JS
+ * arrays. Because we pass the original Document, aliases are resolved through
+ * the document's anchor map.
+ */
+function resolveRawNodes(obj: any, doc: Document): any {
+  if (obj instanceof Flatten) {
+    // obj.sequence is either a raw YAMLSeq (has toJS) or already a JS array
+    const sequence =
+      obj.sequence && typeof (obj.sequence as any).toJS === "function"
+        ? (obj.sequence as any).toJS(doc)
+        : obj.sequence;
+    return new Flatten(
+      (sequence as any[]).map((item: any) => resolveRawNodes(item, doc)),
+    );
+  }
+
+  if (obj instanceof Merge) {
+    const sequence =
+      obj.sequence && typeof (obj.sequence as any).toJS === "function"
+        ? (obj.sequence as any).toJS(doc)
+        : obj.sequence;
+    return new Merge(
+      (sequence as any[]).map((item: any) => resolveRawNodes(item, doc)),
+    );
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item: any) => resolveRawNodes(item, doc));
+  }
+
+  if (
+    obj &&
+    typeof obj === "object" &&
+    !(obj instanceof Reference) &&
+    !(obj instanceof ReferenceAll)
+  ) {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = resolveRawNodes(value, doc);
+    }
+    return result;
+  }
+
+  return obj;
 }
 
 /**
