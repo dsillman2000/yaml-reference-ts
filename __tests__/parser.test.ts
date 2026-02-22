@@ -8,6 +8,7 @@ import {
   Reference,
   ReferenceAll,
   Flatten,
+  Merge,
 } from "../src";
 
 describe("YAML Parser", () => {
@@ -662,6 +663,205 @@ describe("YAML Parser", () => {
 
         expect(result.data).toBeInstanceOf(Flatten);
         expect(result.data.sequence).toEqual([1, 2, 3]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !merge tag with sequence of objects", async () => {
+      const yaml = `
+        data: !merge
+          - { a: 1, b: 2 }
+          - { b: 3, c: 4 }
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toEqual([
+          { a: 1, b: 2 },
+          { b: 3, c: 4 },
+        ]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !merge tag with inline sequence syntax", async () => {
+      const yaml = `
+        data: !merge [{ a: 1 }, { b: 2 }]
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toEqual([{ a: 1 }, { b: 2 }]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !merge tag containing Reference objects", async () => {
+      const yaml = `
+        data: !merge
+          - !reference
+            path: ./defaults.yaml
+          - { override: true }
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toHaveLength(2);
+
+        expect(result.data.sequence[0]).toBeInstanceOf(Reference);
+        expect(result.data.sequence[0].path).toBe("./defaults.yaml");
+        expect(result.data.sequence[0]._location).toBe(filePath);
+
+        expect(result.data.sequence[1]).toEqual({ override: true });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !merge tag containing ReferenceAll objects", async () => {
+      const yaml = `
+        data: !merge
+          - { base: true }
+          - !reference-all
+            glob: ./overrides/*.yaml
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toHaveLength(2);
+
+        expect(result.data.sequence[0]).toEqual({ base: true });
+
+        expect(result.data.sequence[1]).toBeInstanceOf(ReferenceAll);
+        expect(result.data.sequence[1].glob).toBe("./overrides/*.yaml");
+        expect(result.data.sequence[1]._location).toBe(filePath);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse nested !merge tags", async () => {
+      const yaml = `
+        data: !merge
+          - a: 1
+            inner: !merge
+              - { x: 1, y: 1 }
+              - { x: 2 }
+          - { b: 2 }
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toHaveLength(2);
+
+        // First item is an object with a nested Merge
+        expect(result.data.sequence[0].a).toBe(1);
+        expect(result.data.sequence[0].inner).toBeInstanceOf(Merge);
+        expect(result.data.sequence[0].inner.sequence).toEqual([
+          { x: 1, y: 1 },
+          { x: 2 },
+        ]);
+
+        expect(result.data.sequence[1]).toEqual({ b: 2 });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should throw error for !merge applied to non-sequence", async () => {
+      const yaml = `
+        invalid: !merge
+          not_a_sequence: value
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        await expect(parseYamlWithReferences(filePath)).rejects.toThrow(
+          "!merge tag cannot be used on a mapping",
+        );
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !merge tag with empty sequence", async () => {
+      const yaml = `
+        data: !merge []
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.data).toBeInstanceOf(Merge);
+        expect(result.data.sequence).toEqual([]);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }

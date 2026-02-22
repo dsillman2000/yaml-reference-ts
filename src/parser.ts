@@ -7,6 +7,7 @@ import { Document, parse, Tags, YAMLMap, YAMLSeq } from "yaml";
 import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
+import { Merge } from "./Merge";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
@@ -62,7 +63,32 @@ const referenceAllTag = {
   },
 };
 
-const referentialTags: Tags = [referenceTag, referenceAllTag];
+/**
+ * Custom tag for !merge
+ */
+const mergeTag = {
+  identify: (value: any) => value instanceof Merge,
+  tag: "!merge",
+  collection: "seq" as const,
+  resolve: (value: YAMLSeq, _: (message: string) => void) => {
+    const sequence = new Document(value, {
+      customTags,
+    }).toJS();
+    return new Merge(sequence);
+  },
+};
+
+/**
+ * Dummy illegal flag when merge is used on a mapping.
+ */
+const illegalMergeOnMapping = {
+  identify: (value: any) => value instanceof Merge,
+  tag: "!merge",
+  collection: "map" as const,
+  resolve: (_: any, onError: (message: string) => void) => {
+    return onError("!merge tag cannot be used on a mapping");
+  },
+};
 
 /**
  * Custom tag for !flatten
@@ -73,7 +99,7 @@ const flattenTag = {
   collection: "seq" as const,
   resolve: (value: YAMLSeq, _: (message: string) => void) => {
     const sequence = new Document(value, {
-      customTags: referentialTags,
+      customTags,
     }).toJS();
     return new Flatten(sequence);
   },
@@ -97,6 +123,8 @@ const customTags: Tags = [
   referenceAllTag,
   flattenTag,
   illegalFlattenOnMapping,
+  mergeTag,
+  illegalMergeOnMapping,
 ];
 
 /**
@@ -160,10 +188,17 @@ function processParsedDocument(obj: any, filePath: string): any {
   }
 
   if (obj instanceof Flatten) {
-    let processed = obj.sequence.map((item) =>
+    const processed = obj.sequence.map((item) =>
       processParsedDocument(item, filePath),
     );
     return new Flatten(processed);
+  }
+
+  if (obj instanceof Merge) {
+    const processed = obj.sequence.map((item) =>
+      processParsedDocument(item, filePath),
+    );
+    return new Merge(processed);
   }
 
   if (Array.isArray(obj)) {
