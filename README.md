@@ -1,12 +1,13 @@
 # YAML Reference Resolver (TypeScript)
 
-A Node.js TypeScript library for resolving YAML documents containing `!reference` and `!reference-all` tags. The library uses the `eemeli/yaml` package to parse YAML with custom tags and resolve references to external YAML files.
+A Node.js TypeScript library for resolving YAML documents containing `!reference`, `!reference-all`, `!flatten`, and `!merge` tags. The library uses the `eemeli/yaml` package to parse YAML with custom tags and resolve references to external YAML files.
 
 ## Features
 
-- **Custom YAML Tags**: Support for `!reference`, `!reference-all`, and `!flatten` tags
+- **Custom YAML Tags**: Support for `!reference`, `!reference-all`, `!flatten`, and `!merge` tags
 - **Recursive Resolution**: Automatically resolves nested references
 - **Sequence Flattening**: `!flatten` tag for flattening nested arrays
+- **Object Merging**: `!merge` tag for merging sequences of objects with last-write-wins semantics
 - **Circular Reference Detection**: Prevents infinite loops with proper error messages
 - **Glob Pattern Support**: `!reference-all` supports glob patterns for multiple files
 - **CLI Interface**: Command-line tool for resolving YAML files
@@ -14,7 +15,7 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 
 ## Spec
 
-This Node.js TypeScript library implements the YAML specification for cross-file references in YAML files using tags `!reference`, `!reference-all` and `!flatten` tags as defined in the [yaml-reference-specs project](https://github.com/dsillman2000/yaml-reference-specs).
+This Node.js TypeScript library implements the YAML specification for cross-file references in YAML files using tags `!reference`, `!reference-all`, `!flatten` and `!merge` tags as defined in the [yaml-reference-specs project](https://github.com/dsillman2000/yaml-reference-specs).
 
 ## Installation
 
@@ -66,7 +67,24 @@ data: !flatten
 simple: !flatten [1, 2, 3]
 ```
 
-**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>}` or `!reference-all {glob: <glob>}`). For `!flatten` tags, only sequence syntax is supported.
+### Object Merging
+
+```yaml
+# Block sequence syntax
+config: !merge
+  - {host: localhost, port: 3000}
+  - {port: 8080, debug: true}
+
+# Inline sequence syntax
+settings: !merge [{a: 1, b: 2}, {b: 3, c: 4}]
+
+# With references
+merged: !merge
+  - !reference {path: ./defaults.yaml}
+  - {override: true}
+```
+
+**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>}` or `!reference-all {glob: <glob>}`). For `!flatten` and `!merge` tags, only sequence syntax is supported.
 
 **Deterministic Ordering**: The `!reference-all` tag resolves files in alphabetical order to ensure consistent, predictable results across different systems and runs.
 
@@ -90,13 +108,13 @@ async function loadConfig() {
 ### API Reference
 
 #### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<any>`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, and `!flatten` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferences(content: string, filePath: string): Promise<any>`
 Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects.
 
 #### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, and `!flatten` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferencesSync(content: string, filePath: string): any`
 Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects synchronously.
@@ -114,6 +132,10 @@ Represents a `!reference-all` tag with properties:
 #### `Flatten` Class
 Represents a `!flatten` tag with properties:
 - `sequence`: The sequence to be flattened (can contain nested arrays, Reference, and ReferenceAll objects)
+
+#### `Merge` Class
+Represents a `!merge` tag with properties:
+- `sequence`: The sequence of objects to be merged using last-write-wins semantics (can contain Reference and ReferenceAll objects)
 
 ## CLI Usage
 
@@ -264,10 +286,19 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
    - Other values are preserved as-is
 4. The `Flatten` object is replaced with the flattened array. No elements of the resulting array are themselves arrays.
 
+### For `!merge` tags:
+1. The sequence is parsed from the YAML (must be a sequence/array)
+2. `Reference` and `ReferenceAll` objects within the sequence are resolved first
+3. The sequence is flattened (nested arrays from `!reference-all` or `!flatten` are expanded)
+4. Each item in the flattened sequence is validated to be an object (not null, not an array, not a scalar)
+5. The objects are merged using last-write-wins (spread) semantics
+6. The merge is shallow: nested objects are replaced entirely, not deeply merged
+7. The `Merge` object is replaced with the resulting merged object
+
 **Deterministic Behavior**: The library ensures predictable output by:
 - Sorting `!reference-all` file matches alphabetically before resolution
 - Rejecting scalar syntax for `!reference` and `!reference-all` tags (only mapping syntax is allowed)
-- Rejecting mapping syntax for `!flatten` tags (only sequence syntax is allowed)
+- Rejecting mapping syntax for `!flatten` and `!merge` tags (only sequence syntax is allowed)
 - Using consistent error messages for validation failures
 - Enforcing path restrictions to prevent unauthorized file access
 
@@ -282,6 +313,7 @@ The library throws descriptive errors for:
 - Absolute paths in `!reference` or `!reference-all` tags (only relative paths are allowed)
 - References to files outside allowed paths
 - `!flatten` tag applied to non-sequence values
+- `!merge` tag applied to a sequence of values that are not mappings
 
 ## Development
 
@@ -293,6 +325,7 @@ yaml-reference-ts/
 │   ├── index.ts              # Main exports
 │   ├── Reference.ts          # Reference class
 │   ├── ReferenceAll.ts       # ReferenceAll class
+│   ├── Merge.ts              # Merge class
 │   ├── resolver.ts           # loadAndResolve implementation
 │   ├── parser.ts             # YAML parser with custom tags
 │   └── cli/
@@ -356,3 +389,4 @@ npm run lint
 Author(s):
 
 - David Sillman <dsillman2000@gmail.com>
+- Ryan Johnson <github@ryodine.com>
