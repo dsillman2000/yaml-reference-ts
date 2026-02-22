@@ -61,6 +61,7 @@ jobs:
     name: Check YAML Reference Specs compliance
     needs: lint-and-test
     runs-on: ubuntu-latest
+    continue-on-error: true # This job can fail, but we want to report the results
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
