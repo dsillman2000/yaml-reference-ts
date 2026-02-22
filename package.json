@@ -1,6 +1,6 @@
 {
   "name": "@dsillman2000/yaml-reference-ts",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A Node.js TypeScript library for resolving YAML documents containing !reference and !reference-all tags",
   "repository": {
     "type": "git",
