@@ -71,10 +71,10 @@ jobs:
         with:
           node-version: 24.x
 
-      - name: Setup Go 1.22.x
+      - name: Setup Go 1.25.6
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22.x
+          go-version: 1.25.6
 
       - name: Restore build artifacts and node_modules
         uses: actions/cache/restore@v4
