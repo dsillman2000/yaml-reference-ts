@@ -1,4 +1,6 @@
 import * as pathModule from "path";
+import { YAMLMap } from "yaml";
+import { ToJSContext } from "yaml/dist/util";
 
 /**
  * ReferenceAll class representing a !reference-all tag in YAML
@@ -51,5 +53,37 @@ export class ReferenceAll {
    */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.toString();
+  }
+}
+
+export const REFERENCE_ALL_NODE_FLAG = Symbol("isReferenceAll");
+
+export const isResolvedReferenceAllNode = (
+  value: unknown,
+): value is { glob: string } => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    REFERENCE_ALL_NODE_FLAG in value
+  );
+};
+
+export class ReferenceAllNode extends YAMLMap {
+  tag = "!reference-all";
+  toJSON(_: unknown, ctx: ToJSContext) {
+    const value = super.toJSON(_, { ...ctx });
+
+    // Get the glob property from the map
+    const globValue = value.glob;
+    if (!globValue || globValue === null) {
+      throw new Error('!reference-all tag requires a "glob" property');
+    }
+
+    if (typeof globValue !== "string") {
+      throw new Error('!reference-all "glob" property must be a string');
+    }
+
+    Object.assign(value, { [REFERENCE_ALL_NODE_FLAG]: true });
+    return value;
   }
 }
