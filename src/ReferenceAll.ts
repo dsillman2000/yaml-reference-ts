@@ -75,7 +75,7 @@ export class ReferenceAllNode extends YAMLMap {
 
     // Get the glob property from the map
     const globValue = value.glob;
-    if (!globValue || globValue === null) {
+    if (!globValue) {
       throw new Error('!reference-all tag requires a "glob" property');
     }
 

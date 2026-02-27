@@ -2,6 +2,10 @@
  * Main exports for yaml-reference-ts library
  */
 
+export { Reference } from "./Reference";
+export { ReferenceAll } from "./ReferenceAll";
+export { Flatten } from "./Flatten";
+export { Merge } from "./Merge";
 import { loadAndResolve, loadAndResolveSync } from "./resolver";
 export { parseYamlWithReferencesSync, parseYamlWithReferences } from "./parser";
 

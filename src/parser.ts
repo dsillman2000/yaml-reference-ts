@@ -20,7 +20,7 @@ import * as fsSync from "fs";
  * Custom tag for !reference
  */
 const referenceTag = {
-  identify: (value: any) => value instanceof ReferenceAllNode,
+  identify: (value: any) => value instanceof ReferenceNode,
   tag: "!reference",
   collection: "map" as const,
   nodeClass: ReferenceNode,
@@ -47,6 +47,18 @@ const mergeTag = {
 };
 
 /**
+ * Dummy illegal flag when merge is used on a mapping.
+ */
+const illegalMergeOnMapping = {
+  identify: (value: any) => value instanceof Merge,
+  tag: "!merge",
+  collection: "map" as const,
+  resolve: (_: any, onError: (message: string) => void) => {
+    return onError("!merge tag cannot be used on a mapping");
+  },
+};
+
+/**
  * Custom tag for !flatten
  */
 const flattenTag = {
@@ -56,8 +68,27 @@ const flattenTag = {
   nodeClass: FlattenNode,
 };
 
+/**
+ * Dummy illegal flag when flatten is used on a mapping.
+ */
+const illegalFlattenOnMapping = {
+  identify: (value: any) => value instanceof Flatten,
+  tag: "!flatten",
+  collection: "map" as const,
+  resolve: (_: any, onError: (message: string) => void) => {
+    return onError("!flatten tag cannot be used on a mapping");
+  },
+};
+
 // Custom tags array for parsing
-const customTags: Tags = [referenceTag, referenceAllTag, flattenTag, mergeTag];
+const customTags: Tags = [
+  referenceTag,
+  referenceAllTag,
+  flattenTag,
+  illegalFlattenOnMapping,
+  mergeTag,
+  illegalMergeOnMapping,
+];
 
 /**
  * Parse YAML content with custom !reference and !reference-all tags
@@ -73,13 +104,7 @@ export function parseYamlWithReferencesSync(filePath: string): any {
       throw doc.errors[0];
     }
     const parsed = doc.toJS();
-
-    // Convert any raw YAMLSeq nodes stored in Flatten/Merge to JS arrays,
-    // using the original document so that anchors & aliases resolve correctly.
-    // const resolved = resolveRawNodes(parsed, doc);
-
-    // Process the parsed document to set _location on Reference and ReferenceAll objects
-    return processParsedDocument(parsed /* resolved */, filePath);
+    return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -104,13 +129,7 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
       throw doc.errors[0];
     }
     const parsed = doc.toJS();
-
-    // Convert any raw YAMLSeq nodes stored in Flatten/Merge to JS arrays,
-    // using the original document so that anchors & aliases resolve correctly.
-    // const resolved = resolveRawNodes(parsed, doc);
-
-    // Process the parsed document to set _location on Reference and ReferenceAll objects
-    return processParsedDocument(parsed /* resolved */, filePath);
+    return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(

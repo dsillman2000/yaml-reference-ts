@@ -78,7 +78,6 @@ export class ReferenceNode extends YAMLMap {
     }
 
     if (typeof pathValue !== "string") {
-      console.log(pathValue);
       throw new Error('!reference "path" property must be a string');
     }
 
