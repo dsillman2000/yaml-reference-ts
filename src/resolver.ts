@@ -63,8 +63,8 @@ function normalizeAllowPaths(
  * @param arr - Array to deeply flatten
  * @returns Flat array with all nested arrays expanded
  */
-function flattenArray(arr: any[]): any[] {
-  const result: any[] = [];
+function flattenArray(arr: unknown[]): unknown[] {
+  const result: unknown[] = [];
   for (const item of arr) {
     // pre-process the item to resolve any nested transforming tags (!flatten,
     // !merge) before flattening the result
@@ -84,7 +84,7 @@ function flattenArray(arr: any[]): any[] {
  * @returns Merged object
  * @throws Error if any item in the sequence is not an object after flattening
  */
-function resolveMerge(obj: Merge): any {
+function resolveMerge(obj: Merge): unknown {
   // Flatten nested arrays (only within this merge context)
   const flattened = flattenArray(obj.sequence);
   // Validate all items are objects (not null, not array, not scalar)
@@ -112,7 +112,7 @@ function resolveMerge(obj: Merge): any {
  * @param obj - Flatten instance containing the sequence to flatten
  * @returns Flattened array
  */
-function resolveFlatten(obj: Flatten): any {
+function resolveFlatten(obj: Flatten): unknown {
   // Flatten the sequence inside the Flatten object
   return flattenArray(obj.sequence);
 }
@@ -128,7 +128,7 @@ function resolveFlatten(obj: Flatten): any {
  * @param obj - Object that may contain Flatten or Merge instances
  * @returns Object with all Flatten/Merge instances resolved
  */
-export function resolveTransformTagsRecursive(obj: any): any {
+export function resolveTransformTagsRecursive(obj: unknown): unknown {
   // If we are in a sequence, continue recursion until we reach a leaf node
   if (Array.isArray(obj)) {
     return obj.map((item) => resolveTransformTagsRecursive(item));
@@ -144,7 +144,7 @@ export function resolveTransformTagsRecursive(obj: any): any {
     }
 
     // Not one of our tags, but still an object - continue recursion
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = resolveTransformTagsRecursive(value);
     }
@@ -163,7 +163,7 @@ export function resolveTransformTagsRecursive(obj: any): any {
 export async function loadAndResolve(
   filePath: string,
   allowPaths?: string[],
-): Promise<any> {
+): Promise<unknown> {
   const parsed = await parseYamlWithReferences(filePath);
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = await _recursivelyResolveReferences(
@@ -183,7 +183,7 @@ export async function loadAndResolve(
 export function loadAndResolveSync(
   filePath: string,
   allowPaths?: string[],
-): any {
+): unknown {
   const parsed = parseYamlWithReferencesSync(filePath);
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = _recursivelyResolveReferencesSync(
@@ -202,10 +202,10 @@ export function loadAndResolveSync(
  * @returns Object with all references resolved
  */
 export async function _recursivelyResolveReferences(
-  obj: any,
+  obj: unknown,
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
-): Promise<any> {
+): Promise<unknown> {
   if (obj instanceof Reference) {
     return await resolveReference(obj, visitedPaths, allowPaths);
   }
@@ -247,7 +247,7 @@ export async function _recursivelyResolveReferences(
   }
 
   if (obj && typeof obj === "object") {
-    const resolvedObj: any = {};
+    const resolvedObj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       resolvedObj[key] = await _recursivelyResolveReferences(
         value,
@@ -269,10 +269,10 @@ export async function _recursivelyResolveReferences(
  * @returns Object with all references resolved
  */
 export function _recursivelyResolveReferencesSync(
-  obj: any,
+  obj: unknown,
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
-): any {
+): unknown {
   if (obj instanceof Reference) {
     return resolveReferenceSync(obj, visitedPaths, allowPaths);
   }
@@ -314,7 +314,7 @@ export function _recursivelyResolveReferencesSync(
   }
 
   if (obj && typeof obj === "object") {
-    const resolvedObj: any = {};
+    const resolvedObj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       resolvedObj[key] = _recursivelyResolveReferencesSync(
         value,
@@ -340,7 +340,7 @@ async function resolveReference(
   ref: Reference,
   visitedPaths: Set<string>,
   allowPaths?: string[],
-): Promise<any> {
+): Promise<unknown> {
   if (!ref._location) {
     throw new Error(`Reference missing _location: ${ref.toString()}`);
   }
@@ -351,7 +351,7 @@ async function resolveReference(
   let realTargetPath: string;
   try {
     realTargetPath = await fs.realpath(targetPath);
-  } catch (error) {
+  } catch {
     throw new Error(
       `Referenced file not found: ${targetPath} (from ${ref._location})`,
     );
@@ -404,7 +404,7 @@ function resolveReferenceSync(
   ref: Reference,
   visitedPaths: Set<string>,
   allowPaths?: string[],
-): any {
+): unknown {
   if (!ref._location) {
     throw new Error(`Reference missing _location: ${ref.toString()}`);
   }
@@ -415,7 +415,7 @@ function resolveReferenceSync(
   let realTargetPath: string;
   try {
     realTargetPath = fsSync.realpathSync(targetPath);
-  } catch (error) {
+  } catch {
     throw new Error(
       `Referenced file not found: ${targetPath} (from ${ref._location})`,
     );
@@ -468,7 +468,7 @@ async function resolveReferenceAll(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
-): Promise<any[]> {
+): Promise<unknown[]> {
   if (!refAll._location) {
     throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
   }
@@ -480,7 +480,7 @@ async function resolveReferenceAll(
   let matchingFiles: string[];
   try {
     matchingFiles = await glob(globPattern, { absolute: true });
-  } catch (error) {
+  } catch {
     throw new Error(
       `Invalid glob pattern: ${globPattern} (from ${refAll._location})`,
     );
@@ -518,7 +518,7 @@ async function resolveReferenceAll(
   filteredFiles.sort();
 
   // Resolve each matching file
-  const resolvedContents: any[] = [];
+  const resolvedContents: unknown[] = [];
   for (const filePath of filteredFiles) {
     if (visitedPaths.has(filePath)) {
       throw new Error(
@@ -560,7 +560,7 @@ function resolveReferenceAllSync(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
-): any[] {
+): unknown[] {
   if (!refAll._location) {
     throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
   }
@@ -572,7 +572,7 @@ function resolveReferenceAllSync(
   let matchingFiles: string[];
   try {
     matchingFiles = globSync(globPattern, { absolute: true });
-  } catch (error) {
+  } catch {
     throw new Error(
       `Invalid glob pattern: ${globPattern} (from ${refAll._location})`,
     );
@@ -612,7 +612,7 @@ function resolveReferenceAllSync(
   filteredFiles.sort();
 
   // Resolve each matching file
-  const resolvedContents: any[] = [];
+  const resolvedContents: unknown[] = [];
   for (const filePath of filteredFiles) {
     if (visitedPaths.has(filePath)) {
       throw new Error(

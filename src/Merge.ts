@@ -12,13 +12,13 @@ export class Merge {
    * The sequence of objects to be merged
    * This contains the raw parsed YAML document sequence
    */
-  sequence: any[];
+  sequence: unknown[];
 
   /**
    * Creates a new Merge instance
    * @param sequence - The sequence of objects to be merged
    */
-  constructor(sequence: any[]) {
+  constructor(sequence: unknown[]) {
     this.sequence = sequence;
   }
 

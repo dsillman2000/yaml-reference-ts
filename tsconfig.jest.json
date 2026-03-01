@@ -6,6 +6,6 @@
     "module": "commonjs",
     "types": ["jest", "node"]
   },
-  "include": ["src/**/*", "__tests__/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist", "dist-test"]
 }

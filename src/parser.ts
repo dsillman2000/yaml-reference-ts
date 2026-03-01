@@ -20,7 +20,7 @@ import * as fsSync from "fs";
  * Custom tag for !reference
  */
 const referenceTag = {
-  identify: (value: any) => value instanceof ReferenceNode,
+  identify: (value: unknown) => value instanceof ReferenceNode,
   tag: "!reference",
   collection: "map" as const,
   nodeClass: ReferenceNode,
@@ -30,7 +30,7 @@ const referenceTag = {
  * Custom tag for !reference-all
  */
 const referenceAllTag = {
-  identify: (value: any) => value instanceof ReferenceAllNode,
+  identify: (value: unknown) => value instanceof ReferenceAllNode,
   tag: "!reference-all",
   collection: "map" as const,
   nodeClass: ReferenceAllNode,
@@ -40,7 +40,7 @@ const referenceAllTag = {
  * Custom tag for !merge
  */
 const mergeTag = {
-  identify: (value: any) => value instanceof MergeNode,
+  identify: (value: unknown) => value instanceof MergeNode,
   tag: "!merge",
   collection: "seq" as const,
   nodeClass: MergeNode,
@@ -50,10 +50,10 @@ const mergeTag = {
  * Dummy illegal flag when merge is used on a mapping.
  */
 const illegalMergeOnMapping = {
-  identify: (value: any) => value instanceof Merge,
+  identify: (value: unknown) => value instanceof Merge,
   tag: "!merge",
   collection: "map" as const,
-  resolve: (_: any, onError: (message: string) => void) => {
+  resolve: (_: unknown, onError: (message: string) => void) => {
     return onError("!merge tag cannot be used on a mapping");
   },
 };
@@ -62,7 +62,7 @@ const illegalMergeOnMapping = {
  * Custom tag for !flatten
  */
 const flattenTag = {
-  identify: (value: any) => value instanceof FlattenNode,
+  identify: (value: unknown) => value instanceof FlattenNode,
   tag: "!flatten",
   collection: "seq" as const,
   nodeClass: FlattenNode,
@@ -72,10 +72,10 @@ const flattenTag = {
  * Dummy illegal flag when flatten is used on a mapping.
  */
 const illegalFlattenOnMapping = {
-  identify: (value: any) => value instanceof Flatten,
+  identify: (value: unknown) => value instanceof Flatten,
   tag: "!flatten",
   collection: "map" as const,
-  resolve: (_: any, onError: (message: string) => void) => {
+  resolve: (_: unknown, onError: (message: string) => void) => {
     return onError("!flatten tag cannot be used on a mapping");
   },
 };
@@ -95,15 +95,15 @@ const customTags: Tags = [
  * @param filePath - Path to the YAML file to be parsed (used for setting _location)
  * @returns Parsed object with Reference and ReferenceAll instances
  */
-export function parseYamlWithReferencesSync(filePath: string): any {
+export function parseYamlWithReferencesSync(filePath: string): unknown {
   try {
     const absolutePath = path.resolve(filePath);
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    const doc = parseDocument(content, { customTags: customTags });
+    const doc = parseDocument(content, { customTags });
     if (doc.errors.length > 0) {
       throw doc.errors[0];
     }
-    const parsed = doc.toJS();
+    const parsed = doc.toJS() as unknown;
     return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
@@ -120,15 +120,17 @@ export function parseYamlWithReferencesSync(filePath: string): any {
  * @param filePath - Path to the YAML file to be parsed (used for setting _location)
  * @returns Parsed object with Reference and ReferenceAll instances
  */
-export async function parseYamlWithReferences(filePath: string): Promise<any> {
+export async function parseYamlWithReferences(
+  filePath: string,
+): Promise<unknown> {
   try {
     const absolutePath = path.resolve(filePath);
     const content = await fs.readFile(absolutePath, "utf8");
-    const doc = parseDocument(content, { customTags: customTags });
+    const doc = parseDocument(content, { customTags });
     if (doc.errors.length > 0) {
       throw doc.errors[0];
     }
-    const parsed = doc.toJS();
+    const parsed = doc.toJS() as unknown;
     return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
@@ -157,7 +159,7 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
  * @returns The processed object with Reference, ReferenceAll, Flatten, and
  * Merge instances
  */
-function processParsedDocument(obj: any, filePath: string): any {
+function processParsedDocument(obj: unknown, filePath: string): unknown {
   if (isResolvedReferenceNode(obj)) {
     return new Reference(obj.path, filePath);
   }
@@ -181,7 +183,7 @@ function processParsedDocument(obj: any, filePath: string): any {
   }
 
   if (obj && typeof obj === "object") {
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = processParsedDocument(value, filePath);
     }

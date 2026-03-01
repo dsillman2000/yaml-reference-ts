@@ -11,13 +11,13 @@ export class Flatten {
    * The sequence to be flattened
    * This contains the raw parsed YAML document sequence
    */
-  sequence: any[];
+  sequence: unknown[];
 
   /**
    * Creates a new Flatten instance
    * @param sequence - The sequence to be flattened
    */
-  constructor(sequence: any[]) {
+  constructor(sequence: unknown[]) {
     this.sequence = sequence;
   }
 
