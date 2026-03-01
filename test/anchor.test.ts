@@ -265,6 +265,90 @@ deep: !reference {path: depth.yaml, anchor: deep}
       });
     });
 
+    it("should extract a list value by anchor name", async () => {
+      await createTestYamlFile(
+        tempDir,
+        "data.yaml",
+        `
+tags: &tags
+  - alpha
+  - beta
+  - gamma
+other: value
+`,
+      );
+      const mainPath = await createTestYamlFile(
+        tempDir,
+        "main.yaml",
+        `labels: !reference {path: data.yaml, anchor: tags}`,
+      );
+
+      const result = await loadYamlWithReferences(mainPath);
+      expect(result).toEqual({ labels: ["alpha", "beta", "gamma"] });
+    });
+
+    it("should resolve anchors in nested references (reference within reference)", async () => {
+      // main -> middle (anchor: cfg) -> leaf.yaml
+      await createTestYamlFile(
+        tempDir,
+        "leaf.yaml",
+        `
+db_host: db.example.com
+db_port: 5432
+`,
+      );
+      await createTestYamlFile(
+        tempDir,
+        "middle.yaml",
+        `
+ignored: stuff
+config: &cfg
+  database: !reference {path: leaf.yaml}
+  cache: redis
+`,
+      );
+      const mainPath = await createTestYamlFile(
+        tempDir,
+        "main.yaml",
+        `app: !reference {path: middle.yaml, anchor: cfg}`,
+      );
+
+      const result = await loadYamlWithReferences(mainPath);
+      expect(result).toEqual({
+        app: {
+          database: { db_host: "db.example.com", db_port: 5432 },
+          cache: "redis",
+        },
+      });
+    });
+
+    it("should detect circular references even when using anchors", async () => {
+      await createTestYamlFile(
+        tempDir,
+        "a.yaml",
+        `
+val: &val
+  child: !reference {path: b.yaml}
+`,
+      );
+      await createTestYamlFile(
+        tempDir,
+        "b.yaml",
+        `
+data: !reference {path: a.yaml, anchor: val}
+`,
+      );
+      const mainPath = await createTestYamlFile(
+        tempDir,
+        "main.yaml",
+        `result: !reference {path: a.yaml, anchor: val}`,
+      );
+
+      await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
+        /[Cc]ircular/,
+      );
+    });
+
     it("should import the whole file when no anchor is specified", async () => {
       await createTestYamlFile(
         tempDir,
