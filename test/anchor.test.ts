@@ -213,6 +213,24 @@ c: !reference {path: scalars.yaml, anchor: emptyStr}
       expect(result).toEqual({ a: null, b: true, c: "" });
     });
 
+    it("should coerce a numeric anchor name to string", async () => {
+      await createTestYamlFile(
+        tempDir,
+        "data.yaml",
+        `
+val: &1 hello
+`,
+      );
+      const mainPath = await createTestYamlFile(
+        tempDir,
+        "main.yaml",
+        `result: !reference {path: data.yaml, anchor: 1}`,
+      );
+
+      const result = await loadYamlWithReferences(mainPath);
+      expect(result).toEqual({ result: "hello" });
+    });
+
     it("should extract empty containers and populated sequences", async () => {
       await createTestYamlFile(
         tempDir,

@@ -29,8 +29,9 @@ files: !reference-all {glob: ./data/*.yaml}
 - **Properties**:
   - `location` (string): Absolute path to the YAML file where this `!reference` tag was found. This is automatically set by the library during parsing based on the file being processed.
   - `path` (string): Relative path to another YAML file. Required, explicitly provided by the user in the YAML document.
-- **Behavior**: When the YAML parser encounters `!reference`, it should instantiate a `Reference` object with the provided path.
-- **Resolution**: The resolution engine should resolve the YAML content of the reference relative to the file containing the `!reference` tag.
+  - `anchor` (string, optional): Name of a YAML anchor (`&name`) defined in the target file. When provided, only the value attached to that anchor is extracted instead of the entire document. An error is raised if the anchor does not exist in the target file.
+- **Behavior**: When the YAML parser encounters `!reference`, it should instantiate a `Reference` object with the provided path and optional anchor.
+- **Resolution**: The resolution engine should resolve the YAML content of the reference relative to the file containing the `!reference` tag. If `anchor` is specified, the engine extracts the anchored value from the parsed AST (after resolving aliases and tags like `!merge`) rather than returning the whole document.
 
 #### 1.2 `!reference-all` Tag  
 - **Tag Name**: `!reference-all`
@@ -38,8 +39,9 @@ files: !reference-all {glob: ./data/*.yaml}
 - **Properties**:
   - `location` (string): Absolute path to the YAML file where this `!reference-all` tag was found. This is automatically set by the library during parsing based on the file being processed.
   - `glob` (string): Glob pattern to match YAML files. Required, explicitly provided by the user in the YAML document.
-- **Behavior**: When the YAML parser encounters `!reference-all`, it should instantiate a `ReferenceAll` object with the provided glob pattern.
-- **Resolution**: The resolution engine should resolve the YAML content of all references found in the files matched by the glob pattern relative to the file containing the `!reference-all` tag. Files are resolved in deterministic alphabetical order.
+  - `anchor` (string, optional): Name of a YAML anchor (`&name`) defined in each matched file. When provided, only the value attached to that anchor is extracted from each file instead of the entire document. An error is raised if the anchor does not exist in any matched file.
+- **Behavior**: When the YAML parser encounters `!reference-all`, it should instantiate a `ReferenceAll` object with the provided glob pattern and optional anchor.
+- **Resolution**: The resolution engine should resolve the YAML content of all references found in the files matched by the glob pattern relative to the file containing the `!reference-all` tag. If `anchor` is specified, the engine extracts the anchored value from each file. Files are resolved in deterministic alphabetical order.
 
 #### 1.3 Implementation Details
 - Both classes should be exported from the library
@@ -227,11 +229,13 @@ export async function loadAndResolve(filePath: string): Promise<any>;
 interface Reference {
   location: string;
   path: string;
+  anchor?: string;
 }
 
 interface ReferenceAll {
   location: string;
   glob: string;
+  anchor?: string;
 }
 
 type YamlContent = any; // Could be refined based on use cases

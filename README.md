@@ -121,14 +121,14 @@ async function loadConfig() {
 #### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<any>`
 Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
-#### `parseYamlWithReferences(content: string, filePath: string): Promise<any>`
-Parses YAML content with custom tags, setting `location` on Reference and parsing Flatten objects.
+#### `parseYamlWithReferences(filePath: string, options?: ParseOptions): Promise<any>`
+Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file.
 
 #### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
 Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
-#### `parseYamlWithReferencesSync(content: string, filePath: string): any`
-Parses YAML content with custom tags, setting `location` on Reference and parsing Flatten objects synchronously.
+#### `parseYamlWithReferencesSync(filePath: string, options?: ParseOptions): any`
+Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances synchronously. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file.
 
 #### `Reference` Class
 Represents a `!reference` tag with properties:

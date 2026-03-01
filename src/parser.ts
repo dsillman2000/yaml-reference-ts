@@ -162,7 +162,7 @@ export function parseYamlWithReferencesSync(
   try {
     const absolutePath = path.resolve(filePath);
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, filePath, options);
+    return parseYamlWithReferencesFromString(content, absolutePath, options);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -188,7 +188,7 @@ export async function parseYamlWithReferences(
   try {
     const absolutePath = path.resolve(filePath);
     const content = await fs.readFile(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, filePath, options);
+    return parseYamlWithReferencesFromString(content, absolutePath, options);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(

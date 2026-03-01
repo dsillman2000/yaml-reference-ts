@@ -91,6 +91,16 @@ export class ReferenceNode extends YAMLMap {
       throw new Error('!reference "path" property must be a string');
     }
 
+    // Coerce anchor to string if present (e.g. anchor: 1 is valid YAML
+    // but parsed as a number)
+    if ("anchor" in value && value.anchor !== undefined) {
+      if (typeof value.anchor === "object") {
+        throw new Error('!reference "anchor" property must be a scalar value');
+      }
+      const anchorVal = value.anchor as string | number | boolean;
+      value.anchor = String(anchorVal);
+    }
+
     Object.assign(value, { [REFERENCE_NODE_FLAG]: true });
     return value;
   }
