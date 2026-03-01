@@ -69,7 +69,7 @@ export const isResolvedReferenceNode = (
 export class ReferenceNode extends YAMLMap {
   tag = "!reference";
   toJSON(_: unknown, ctx: ToJSContext) {
-    const value = super.toJSON(_, { ...ctx });
+    const value = super.toJSON(_, { ...ctx }) as Record<string, unknown>;
 
     // Get the path property from the map
     const pathValue = value.path;

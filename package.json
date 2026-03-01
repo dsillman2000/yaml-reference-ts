@@ -16,15 +16,15 @@
     "yaml-reference-cli": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc -b tsconfig.build.json",
+    "dev": "tsc -b tsconfig.build.json --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:specs": "chmod +x $PWD/dist/cli/index.js && curl -sL https://api.github.com/repos/dsillman2000/yaml-reference-specs/releases/latest | jq -r .tag_name | YAML_REFERENCE_CLI_EXECUTABLE=$PWD/dist/cli/index.js xargs -I {} go run github.com/dsillman2000/yaml-reference-specs@{}",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint --config .eslintrc.js src/**/*.ts",
+    "lint": "eslint -c eslint.config.mjs",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },
@@ -42,7 +42,6 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.2",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
@@ -51,7 +50,20 @@
     "jest": "^30.2.0",
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  },
+  "overrides": {
+    "test-exclude": "^8.0.0",
+    "@jest/reporters": {
+      "glob": "$glob"
+    },
+    "jest-config": {
+      "glob": "$glob"
+    },
+    "jest-runtime": {
+      "glob": "$glob"
+    }
   },
   "files": [
     "dist",

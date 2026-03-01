@@ -2,7 +2,7 @@
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
-  roots: ["<rootDir>/__tests__"],
+  roots: ["<rootDir>/test/"],
   testMatch: ["**/*.test.ts"],
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts", "!src/cli/index.ts"],
   coverageDirectory: "coverage",
@@ -14,7 +14,6 @@ module.exports = {
       {
         tsconfig: "tsconfig.jest.json",
         useESM: false,
-        isolatedModules: true,
       },
     ],
   },

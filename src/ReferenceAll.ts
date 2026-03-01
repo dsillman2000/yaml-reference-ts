@@ -71,7 +71,7 @@ export const isResolvedReferenceAllNode = (
 export class ReferenceAllNode extends YAMLMap {
   tag = "!reference-all";
   toJSON(_: unknown, ctx: ToJSContext) {
-    const value = super.toJSON(_, { ...ctx });
+    const value = super.toJSON(_, { ...ctx }) as Record<string, unknown>;
 
     // Get the glob property from the map
     const globValue = value.glob;

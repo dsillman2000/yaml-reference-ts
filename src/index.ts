@@ -17,7 +17,7 @@ export { parseYamlWithReferencesSync, parseYamlWithReferences } from "./parser";
 export async function loadYamlWithReferences(
   filePath: string,
   allowPaths?: string[],
-): Promise<any> {
+): Promise<unknown> {
   return await loadAndResolve(filePath, allowPaths);
 }
 
@@ -29,6 +29,6 @@ export async function loadYamlWithReferences(
 export function loadYamlWithReferencesSync(
   filePath: string,
   allowPaths?: string[],
-): any {
+): unknown {
   return loadAndResolveSync(filePath, allowPaths);
 }

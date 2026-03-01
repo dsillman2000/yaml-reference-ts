@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- CLI should use console for output and errors */
 
 /**
  * CLI implementation for yaml-reference-ts
@@ -45,17 +46,17 @@ Exit Codes:
 /**
  * Sort object keys alphabetically (recursively)
  */
-function sortObjectKeys(obj: any): any {
+function sortObjectKeys(obj: unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map((item) => sortObjectKeys(item));
   }
 
   if (obj && typeof obj === "object" && !(obj instanceof Date)) {
-    const sortedObj: any = {};
+    const sortedObj: Record<string, unknown> = {};
     // Get keys, sort them alphabetically
     const keys = Object.keys(obj).sort();
     for (const key of keys) {
-      sortedObj[key] = sortObjectKeys(obj[key]);
+      sortedObj[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
     }
     return sortedObj;
   }
@@ -123,7 +124,7 @@ async function main(): Promise<void> {
   try {
     // Check if file exists
     await fs.access(filePath);
-  } catch (error) {
+  } catch {
     console.error(`Error: File not found: ${filePath}`);
     process.exit(1);
   }
