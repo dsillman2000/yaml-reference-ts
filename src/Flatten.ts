@@ -1,3 +1,6 @@
+import { YAMLSeq } from "yaml";
+import type { ToJSContext } from "yaml/dist/util";
+
 /**
  * Flatten class representing a !flatten tag in YAML
  * This class is instantiated when the YAML parser encounters a !flatten tag
@@ -30,5 +33,20 @@ export class Flatten {
    */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.toString();
+  }
+}
+
+export const FLATTEN_NODE_FLAG = Symbol("isFlatten");
+
+export const isResolvedFlattenNode = (value: unknown): value is object[] => {
+  return Array.isArray(value) && FLATTEN_NODE_FLAG in value;
+};
+
+export class FlattenNode extends YAMLSeq {
+  tag = "!flatten";
+  toJSON(_: unknown, ctx: ToJSContext) {
+    const data = super.toJSON(_, ctx);
+    Object.assign(data, { [FLATTEN_NODE_FLAG]: true });
+    return data;
   }
 }

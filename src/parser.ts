@@ -3,11 +3,15 @@
  * Uses the eemeli/yaml package to parse YAML with custom tags
  */
 
-import { Document, parse, Tags, YAMLMap, YAMLSeq } from "yaml";
-import { Reference } from "./Reference";
-import { ReferenceAll } from "./ReferenceAll";
-import { Flatten } from "./Flatten";
-import { Merge } from "./Merge";
+import { parseDocument, Tags } from "yaml";
+import { isResolvedReferenceNode, Reference, ReferenceNode } from "./Reference";
+import {
+  isResolvedReferenceAllNode,
+  ReferenceAll,
+  ReferenceAllNode,
+} from "./ReferenceAll";
+import { FlattenNode, Flatten, isResolvedFlattenNode } from "./Flatten";
+import { MergeNode, Merge, isResolvedMergeNode } from "./Merge";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
@@ -16,66 +20,30 @@ import * as fsSync from "fs";
  * Custom tag for !reference
  */
 const referenceTag = {
-  identify: (value: any) => value instanceof Reference,
+  identify: (value: any) => value instanceof ReferenceNode,
   tag: "!reference",
   collection: "map" as const,
-  resolve: (value: any, onError: (message: string) => void) => {
-    // value should be a YAMLMap for mapping syntax
-    if (!(value instanceof YAMLMap)) {
-      return onError(
-        '!reference tag must be followed by a mapping with a "path" property',
-      );
-    }
-
-    // Get the path property from the map
-    const pathValue = value.get("path");
-    if (!pathValue) {
-      return onError('!reference tag requires a "path" property');
-    }
-
-    if (typeof pathValue !== "string") {
-      return onError('!reference "path" property must be a string');
-    }
-
-    return new Reference(pathValue);
-  },
+  nodeClass: ReferenceNode,
 };
 
 /**
  * Custom tag for !reference-all
  */
 const referenceAllTag = {
-  identify: (value: any) => value instanceof ReferenceAll,
+  identify: (value: any) => value instanceof ReferenceAllNode,
   tag: "!reference-all",
   collection: "map" as const,
-  resolve: (value: any, onError: (message: string) => void) => {
-    // Get the glob property from the map
-    const globValue = value.get("glob");
-    if (!globValue || globValue === null) {
-      return onError('!reference-all tag requires a "glob" property');
-    }
-
-    if (typeof globValue !== "string") {
-      return onError('!reference-all "glob" property must be a string');
-    }
-
-    return new ReferenceAll(globValue);
-  },
+  nodeClass: ReferenceAllNode,
 };
 
 /**
  * Custom tag for !merge
  */
 const mergeTag = {
-  identify: (value: any) => value instanceof Merge,
+  identify: (value: any) => value instanceof MergeNode,
   tag: "!merge",
   collection: "seq" as const,
-  resolve: (value: YAMLSeq, _: (message: string) => void) => {
-    const sequence = new Document(value, {
-      customTags,
-    }).toJS();
-    return new Merge(sequence);
-  },
+  nodeClass: MergeNode,
 };
 
 /**
@@ -94,15 +62,10 @@ const illegalMergeOnMapping = {
  * Custom tag for !flatten
  */
 const flattenTag = {
-  identify: (value: any) => value instanceof Flatten,
+  identify: (value: any) => value instanceof FlattenNode,
   tag: "!flatten",
   collection: "seq" as const,
-  resolve: (value: YAMLSeq, _: (message: string) => void) => {
-    const sequence = new Document(value, {
-      customTags,
-    }).toJS();
-    return new Flatten(sequence);
-  },
+  nodeClass: FlattenNode,
 };
 
 /**
@@ -136,9 +99,11 @@ export function parseYamlWithReferencesSync(filePath: string): any {
   try {
     const absolutePath = path.resolve(filePath);
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    const parsed = parse(content, { customTags: customTags });
-
-    // Process the parsed document to set _location on Reference and ReferenceAll objects
+    const doc = parseDocument(content, { customTags: customTags });
+    if (doc.errors.length > 0) {
+      throw doc.errors[0];
+    }
+    const parsed = doc.toJS();
     return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
@@ -159,9 +124,11 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
   try {
     const absolutePath = path.resolve(filePath);
     const content = await fs.readFile(absolutePath, "utf8");
-    const parsed = parse(content, { customTags: customTags });
-
-    // Process the parsed document to set _location on Reference and ReferenceAll objects
+    const doc = parseDocument(content, { customTags: customTags });
+    if (doc.errors.length > 0) {
+      throw doc.errors[0];
+    }
+    const parsed = doc.toJS();
     return processParsedDocument(parsed, filePath);
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
@@ -174,30 +141,38 @@ export async function parseYamlWithReferences(filePath: string): Promise<any> {
 }
 
 /**
- * Recursively process parsed document to set _location on Reference and ReferenceAll objects
+ * Recursively process the parsed YAML document and convert based on set symbols
+ * to the appropriate Reference, ReferenceAll, Flatten, and Merge instances.
+ *
+ * This step happens after the entire YAML tree is converted through all layers
+ * of the yaml library (text -> CST -> AST -> JS) so that all anchors are
+ * resolved.
+ *
+ * The symbols are injected at the AST -> JS layer (in the toJSON methods of the
+ * custom nodes) so that they are present on the final JS objects we get here.
+ *
+ * @param obj - The parsed YAML document (or sub-object) to process
+ * @param filePath - The file path to set as _location on Reference and
+ * ReferenceAll instances
+ * @returns The processed object with Reference, ReferenceAll, Flatten, and
+ * Merge instances
  */
 function processParsedDocument(obj: any, filePath: string): any {
-  if (obj instanceof Reference) {
-    obj._location = filePath;
-    return obj;
+  if (isResolvedReferenceNode(obj)) {
+    return new Reference(obj.path, filePath);
   }
 
-  if (obj instanceof ReferenceAll) {
-    obj._location = filePath;
-    return obj;
+  if (isResolvedReferenceAllNode(obj)) {
+    return new ReferenceAll(obj.glob, filePath);
   }
 
-  if (obj instanceof Flatten) {
-    const processed = obj.sequence.map((item) =>
-      processParsedDocument(item, filePath),
-    );
+  if (isResolvedFlattenNode(obj)) {
+    const processed = obj.map((item) => processParsedDocument(item, filePath));
     return new Flatten(processed);
   }
 
-  if (obj instanceof Merge) {
-    const processed = obj.sequence.map((item) =>
-      processParsedDocument(item, filePath),
-    );
+  if (isResolvedMergeNode(obj)) {
+    const processed = obj.map((item) => processParsedDocument(item, filePath));
     return new Merge(processed);
   }
 

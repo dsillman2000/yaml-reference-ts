@@ -866,6 +866,80 @@ describe("YAML Parser", () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     });
+
+    it("should resolve anchor on a !merge tag and alias an equivalent value elsewhere", async () => {
+      const yaml = `
+merged: !merge &m
+  - { a: 1, b: 2 }
+  - { b: 3, c: 4 }
+data:
+  copy: *m
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        // The anchored value should parse as a Merge
+        expect(result.merged).toBeInstanceOf(Merge);
+        expect(result.merged.sequence).toEqual([
+          { a: 1, b: 2 },
+          { b: 3, c: 4 },
+        ]);
+
+        // The alias should resolve to the same Merge
+        expect(result.data.copy).toBeInstanceOf(Merge);
+        expect(result.data.copy.sequence).toEqual([
+          { a: 1, b: 2 },
+          { b: 3, c: 4 },
+        ]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should resolve anchor on a !flatten tag and alias an equivalent value elsewhere", async () => {
+      const yaml = `
+flat: !flatten &f
+  - [1, 2]
+  - [3, 4]
+data:
+  copy: *f
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.flat).toBeInstanceOf(Flatten);
+        expect(result.flat.sequence).toEqual([
+          [1, 2],
+          [3, 4],
+        ]);
+
+        expect(result.data.copy).toBeInstanceOf(Flatten);
+        expect(result.data.copy.sequence).toEqual([
+          [1, 2],
+          [3, 4],
+        ]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
 
   // describe("parseYamlWithReferencesSync", () => {

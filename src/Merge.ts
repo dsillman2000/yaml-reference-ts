@@ -1,3 +1,6 @@
+import { YAMLSeq } from "yaml";
+import type { ToJSContext } from "yaml/dist/util";
+
 /**
  * Merge class representing a !merge tag in YAML
  * This class is instantiated when the YAML parser encounters a !merge tag
@@ -31,5 +34,20 @@ export class Merge {
    */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.toString();
+  }
+}
+
+export const MERGE_NODE_FLAG = Symbol("isMerge");
+
+export const isResolvedMergeNode = (value: unknown): value is object[] => {
+  return Array.isArray(value) && MERGE_NODE_FLAG in value;
+};
+
+export class MergeNode extends YAMLSeq {
+  tag = "!merge";
+  toJSON(_: unknown, ctx: ToJSContext) {
+    const data = super.toJSON(_, ctx);
+    Object.assign(data, { [MERGE_NODE_FLAG]: true });
+    return data;
   }
 }
