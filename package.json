@@ -42,7 +42,6 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.2",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
@@ -53,6 +52,18 @@
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
+  },
+  "overrides": {
+    "test-exclude": "^8.0.0",
+    "@jest/reporters": {
+      "glob": "$glob"
+    },
+    "jest-config": {
+      "glob": "$glob"
+    },
+    "jest-runtime": {
+      "glob": "$glob"
+    }
   },
   "files": [
     "dist",
