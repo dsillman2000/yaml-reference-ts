@@ -16,15 +16,15 @@
     "yaml-reference-cli": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc -b tsconfig.build.json",
+    "dev": "tsc -b tsconfig.build.json --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:specs": "chmod +x $PWD/dist/cli/index.js && curl -sL https://api.github.com/repos/dsillman2000/yaml-reference-specs/releases/latest | jq -r .tag_name | YAML_REFERENCE_CLI_EXECUTABLE=$PWD/dist/cli/index.js xargs -I {} go run github.com/dsillman2000/yaml-reference-specs@{}",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint",
+    "lint": "eslint -c eslint.config.mjs",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },

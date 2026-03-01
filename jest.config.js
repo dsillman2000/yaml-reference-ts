@@ -14,7 +14,6 @@ module.exports = {
       {
         tsconfig: "tsconfig.jest.json",
         useESM: false,
-        isolatedModules: true,
       },
     ],
   },
