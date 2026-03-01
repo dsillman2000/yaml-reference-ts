@@ -1,5 +1,5 @@
 import { YAMLSeq } from "yaml";
-import { ToJSContext } from "yaml/dist/util";
+import type { ToJSContext } from "yaml/dist/util";
 
 /**
  * Flatten class representing a !flatten tag in YAML
@@ -39,9 +39,7 @@ export class Flatten {
 export const FLATTEN_NODE_FLAG = Symbol("isFlatten");
 
 export const isResolvedFlattenNode = (value: unknown): value is object[] => {
-  return (
-    typeof value === "object" && value !== null && FLATTEN_NODE_FLAG in value
-  );
+  return Array.isArray(value) && FLATTEN_NODE_FLAG in value;
 };
 
 export class FlattenNode extends YAMLSeq {

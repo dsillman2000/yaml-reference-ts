@@ -1,5 +1,5 @@
 import { YAMLSeq } from "yaml";
-import { ToJSContext } from "yaml/dist/util";
+import type { ToJSContext } from "yaml/dist/util";
 
 /**
  * Merge class representing a !merge tag in YAML
@@ -40,9 +40,7 @@ export class Merge {
 export const MERGE_NODE_FLAG = Symbol("isMerge");
 
 export const isResolvedMergeNode = (value: unknown): value is object[] => {
-  return (
-    typeof value === "object" && value !== null && MERGE_NODE_FLAG in value
-  );
+  return Array.isArray(value) && MERGE_NODE_FLAG in value;
 };
 
 export class MergeNode extends YAMLSeq {

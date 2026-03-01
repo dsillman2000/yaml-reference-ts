@@ -867,7 +867,7 @@ describe("YAML Parser", () => {
       }
     });
 
-    it("should resolve anchor on a !merge tag and alias it elsewhere", async () => {
+    it("should resolve anchor on a !merge tag and alias an equivalent value elsewhere", async () => {
       const yaml = `
 merged: !merge &m
   - { a: 1, b: 2 }
@@ -905,7 +905,7 @@ data:
       }
     });
 
-    it("should resolve anchor on a !flatten tag and alias it elsewhere", async () => {
+    it("should resolve anchor on a !flatten tag and alias an equivalent value elsewhere", async () => {
       const yaml = `
 flat: !flatten &f
   - [1, 2]
