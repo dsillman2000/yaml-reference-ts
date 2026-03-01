@@ -40,6 +40,14 @@ database: !reference
 
 # Inline mapping syntax  
 settings: !reference {path: ./settings/production.yaml}
+
+# Extract a specific anchor from the referenced file
+db_host: !reference {path: ./config/database.yaml, anchor: host}
+
+# Block style with anchor
+db_config: !reference
+  path: ./config/database.yaml
+  anchor: cfg
 ```
 
 ### Multiple File Reference
@@ -51,6 +59,9 @@ configs: !reference-all
 
 # Inline mapping syntax
 files: !reference-all {glob: ./data/*.yaml}
+
+# Extract a specific anchor from each matched file
+ports: !reference-all {glob: ./services/*.yaml, anchor: port}
 ```
 
 ### Sequence Flattening
@@ -84,7 +95,7 @@ merged: !merge
   - {override: true}
 ```
 
-**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>}` or `!reference-all {glob: <glob>}`). For `!flatten` and `!merge` tags, only sequence syntax is supported.
+**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>, anchor: <anchor>}` or `!reference-all {glob: <glob>, anchor: <anchor>}`, where `anchor` is optional). For `!flatten` and `!merge` tags, only sequence syntax is supported.
 
 **Deterministic Ordering**: The `!reference-all` tag resolves files in alphabetical order to ensure consistent, predictable results across different systems and runs.
 
@@ -111,23 +122,25 @@ async function loadConfig() {
 Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferences(content: string, filePath: string): Promise<any>`
-Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects.
+Parses YAML content with custom tags, setting `location` on Reference and parsing Flatten objects.
 
 #### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
 Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
 
 #### `parseYamlWithReferencesSync(content: string, filePath: string): any`
-Parses YAML content with custom tags, setting `_location` on Reference and parsing Flatten objects synchronously.
+Parses YAML content with custom tags, setting `location` on Reference and parsing Flatten objects synchronously.
 
 #### `Reference` Class
 Represents a `!reference` tag with properties:
-- `_location`: Absolute path to the file containing the reference
+- `location`: Absolute path to the file containing the reference
 - `path`: Relative path to the referenced YAML file
+- `anchor` (optional): Name of an anchor defined in the target file to extract instead of the whole document. Raises an error if the anchor does not exist.
 
 #### `ReferenceAll` Class
 Represents a `!reference-all` tag with properties:
-- `_location`: Absolute path to the file containing the reference
+- `location`: Absolute path to the file containing the reference
 - `glob`: Glob pattern to match YAML files
+- `anchor` (optional): Name of an anchor defined in each matched file to extract instead of the whole document. Raises an error if the anchor does not exist in any matched file.
 
 #### `Flatten` Class
 Represents a `!flatten` tag with properties:
@@ -260,23 +273,27 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 
 ### For `!reference` tags:
 1. The `path` property is parsed from the YAML mapping (must be a relative path)
-2. `_location` is automatically set to the absolute path of the containing file
-3. The referenced YAML file is read and parsed relative to `_location`
-4. The target path is checked against allowed paths (see Path Restrictions)
-5. Any references within the referenced file are recursively resolved
-6. The `Reference` object is replaced with the resolved content
+2. The optional `anchor` property specifies a YAML anchor (`&name`) to extract from the target file
+3. `location` is automatically set to the absolute path of the containing file
+4. The referenced YAML file is read and parsed relative to `location`
+5. The target path is checked against allowed paths (see Path Restrictions)
+6. If `anchor` is specified, only the value attached to that anchor is extracted (after resolving aliases and tags like `!merge` within the target file). An error is raised if the anchor does not exist.
+7. Any references within the resolved content are recursively resolved
+8. The `Reference` object is replaced with the resolved content
 
 ### For `!reference-all` tags:
 1. The `glob` property is parsed from the YAML mapping (must be a relative glob pattern)
-2. `_location` is automatically set to the absolute path of the containing file
-3. The glob pattern is evaluated relative to `_location`
-4. Matching files are filtered based on allowed paths (see Path Restrictions)
-5. For each matching YAML file:
+2. The optional `anchor` property specifies a YAML anchor (`&name`) to extract from each matched file
+3. `location` is automatically set to the absolute path of the containing file
+4. The glob pattern is evaluated relative to `location`
+5. Matching files are filtered based on allowed paths (see Path Restrictions)
+6. For each matching YAML file:
    - The file is read and parsed
+   - If `anchor` is specified, only the value attached to that anchor is extracted. An error is raised if the anchor does not exist in any matched file.
    - Any references are recursively resolved
-6. The `ReferenceAll` object is replaced with an array of resolved contents
-7. Files are sorted and resolved in deterministic alphabetical order for consistent results across systems
-8. If no files match, an error is thrown
+7. The `ReferenceAll` object is replaced with an array of resolved contents
+8. Files are sorted and resolved in deterministic alphabetical order for consistent results across systems
+9. If no files match, an error is thrown
 
 ### For `!flatten` tags:
 1. The sequence is parsed from the YAML (must be a sequence/array)
@@ -312,6 +329,7 @@ The library throws descriptive errors for:
 - Missing required properties (`path` for `!reference`, `glob` for `!reference-all`)
 - Absolute paths in `!reference` or `!reference-all` tags (only relative paths are allowed)
 - References to files outside allowed paths
+- Non-existent `anchor` in a referenced file (or in any file matched by `!reference-all`)
 - `!flatten` tag applied to non-sequence values
 - `!merge` tag applied to a sequence of values that are not mappings
 

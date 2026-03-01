@@ -341,11 +341,11 @@ async function resolveReference(
   visitedPaths: Set<string>,
   allowPaths?: string[],
 ): Promise<unknown> {
-  if (!ref._location) {
-    throw new Error(`Reference missing _location: ${ref.toString()}`);
+  if (!ref.location) {
+    throw new Error(`Reference missing location: ${ref.toString()}`);
   }
 
-  const refDir = path.dirname(ref._location);
+  const refDir = path.dirname(ref.location);
   const targetPath = path.resolve(refDir, ref.path);
 
   let realTargetPath: string;
@@ -353,7 +353,7 @@ async function resolveReference(
     realTargetPath = await fs.realpath(targetPath);
   } catch {
     throw new Error(
-      `Referenced file not found: ${targetPath} (from ${ref._location})`,
+      `Referenced file not found: ${targetPath} (from ${ref.location})`,
     );
   }
 
@@ -379,7 +379,9 @@ async function resolveReference(
 
   visitedPaths.add(realTargetPath);
 
-  const parsed = await parseYamlWithReferences(realTargetPath);
+  const parsed = await parseYamlWithReferences(realTargetPath, {
+    extractAnchor: ref.anchor,
+  });
 
   const resolved = await _recursivelyResolveReferences(
     parsed,
@@ -405,11 +407,11 @@ function resolveReferenceSync(
   visitedPaths: Set<string>,
   allowPaths?: string[],
 ): unknown {
-  if (!ref._location) {
-    throw new Error(`Reference missing _location: ${ref.toString()}`);
+  if (!ref.location) {
+    throw new Error(`Reference missing location: ${ref.toString()}`);
   }
 
-  const refDir = path.dirname(ref._location);
+  const refDir = path.dirname(ref.location);
   const targetPath = path.resolve(refDir, ref.path);
 
   let realTargetPath: string;
@@ -417,7 +419,7 @@ function resolveReferenceSync(
     realTargetPath = fsSync.realpathSync(targetPath);
   } catch {
     throw new Error(
-      `Referenced file not found: ${targetPath} (from ${ref._location})`,
+      `Referenced file not found: ${targetPath} (from ${ref.location})`,
     );
   }
 
@@ -443,7 +445,9 @@ function resolveReferenceSync(
 
   visitedPaths.add(realTargetPath);
 
-  const parsed = parseYamlWithReferencesSync(realTargetPath);
+  const parsed = parseYamlWithReferencesSync(realTargetPath, {
+    extractAnchor: ref.anchor,
+  });
 
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
@@ -462,18 +466,18 @@ function resolveReferenceSync(
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved array of objects. Will not contain any references.
- * @throws Error if the ReferenceAll object is missing _location or if the glob pattern is invalid.
+ * @throws Error if the ReferenceAll object is missing location or if the glob pattern is invalid.
  */
 async function resolveReferenceAll(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
 ): Promise<unknown[]> {
-  if (!refAll._location) {
-    throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
+  if (!refAll.location) {
+    throw new Error(`ReferenceAll missing location: ${refAll.toString()}`);
   }
 
-  const refDir = path.dirname(refAll._location);
+  const refDir = path.dirname(refAll.location);
   const globPattern = path.resolve(refDir, refAll.glob);
 
   // Find files matching the glob pattern
@@ -482,7 +486,7 @@ async function resolveReferenceAll(
     matchingFiles = await glob(globPattern, { absolute: true });
   } catch {
     throw new Error(
-      `Invalid glob pattern: ${globPattern} (from ${refAll._location})`,
+      `Invalid glob pattern: ${globPattern} (from ${refAll.location})`,
     );
   }
 
@@ -510,7 +514,7 @@ async function resolveReferenceAll(
 
   if (filteredFiles.length === 0) {
     throw new Error(
-      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll._location})`,
+      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll.location})`,
     );
   }
 
@@ -529,7 +533,9 @@ async function resolveReferenceAll(
     visitedPaths.add(filePath);
 
     try {
-      const parsed = await parseYamlWithReferences(filePath);
+      const parsed = await parseYamlWithReferences(filePath, {
+        extractAnchor: refAll.anchor,
+      });
 
       const resolved = await _recursivelyResolveReferences(
         parsed,
@@ -554,18 +560,18 @@ async function resolveReferenceAll(
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
  * @returns Resolved array of objects. Will not contain any references.
- * @throws Error if the ReferenceAll object is missing _location or if the glob pattern is invalid.
+ * @throws Error if the ReferenceAll object is missing location or if the glob pattern is invalid.
  */
 function resolveReferenceAllSync(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
 ): unknown[] {
-  if (!refAll._location) {
-    throw new Error(`ReferenceAll missing _location: ${refAll.toString()}`);
+  if (!refAll.location) {
+    throw new Error(`ReferenceAll missing location: ${refAll.toString()}`);
   }
 
-  const refDir = path.dirname(refAll._location);
+  const refDir = path.dirname(refAll.location);
   const globPattern = path.resolve(refDir, refAll.glob);
 
   // Find files matching the glob pattern
@@ -574,7 +580,7 @@ function resolveReferenceAllSync(
     matchingFiles = globSync(globPattern, { absolute: true });
   } catch {
     throw new Error(
-      `Invalid glob pattern: ${globPattern} (from ${refAll._location})`,
+      `Invalid glob pattern: ${globPattern} (from ${refAll.location})`,
     );
   }
 
@@ -604,7 +610,7 @@ function resolveReferenceAllSync(
 
   if (filteredFiles.length === 0) {
     throw new Error(
-      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll._location})`,
+      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll.location})`,
     );
   }
 
@@ -623,7 +629,9 @@ function resolveReferenceAllSync(
     visitedPaths.add(filePath);
 
     try {
-      const parsed = parseYamlWithReferencesSync(filePath);
+      const parsed = parseYamlWithReferencesSync(filePath, {
+        extractAnchor: refAll.anchor,
+      });
 
       const resolved = _recursivelyResolveReferencesSync(
         parsed,
