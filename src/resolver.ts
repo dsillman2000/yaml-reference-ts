@@ -369,7 +369,6 @@ async function resolveReference(
       );
     }
   }
-
   // Check for circular references
   if (visitedPaths.has(realTargetPath)) {
     throw new Error(
@@ -510,12 +509,6 @@ async function resolveReferenceAll(
     filteredFiles = realMatchingFiles.filter((realPath) => {
       return allowPaths.some((allowedPath) => isSubPath(realPath, allowedPath));
     });
-  }
-
-  if (filteredFiles.length === 0) {
-    throw new Error(
-      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll.location})`,
-    );
   }
 
   // Sort files alphabetically for consistent ordering
