@@ -479,6 +479,7 @@ async function resolveReferenceAll(
 
   const refDir = path.dirname(refAll.location);
   const globPattern = path.resolve(refDir, refAll.glob);
+
   // Find files matching the glob pattern
   let matchingFiles: string[];
   try {
