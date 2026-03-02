@@ -4,90 +4,24 @@
  */
 
 import { Document, Node, parseDocument, Tags, visit } from "yaml";
-import { isResolvedReferenceNode, Reference, ReferenceNode } from "./Reference";
+import { isResolvedReferenceNode, Reference, referenceTags } from "./Reference";
 import {
   isResolvedReferenceAllNode,
   ReferenceAll,
-  ReferenceAllNode,
+  ReferenceAllTags,
 } from "./ReferenceAll";
-import { FlattenNode, Flatten, isResolvedFlattenNode } from "./Flatten";
-import { MergeNode, Merge, isResolvedMergeNode } from "./Merge";
+import { Flatten, isResolvedFlattenNode, FlattenTags } from "./Flatten";
+import { Merge, isResolvedMergeNode, MergeTags } from "./Merge";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 
-/**
- * Custom tag for !reference
- */
-const referenceTag = {
-  identify: (value: unknown) => value instanceof ReferenceNode,
-  tag: "!reference",
-  collection: "map" as const,
-  nodeClass: ReferenceNode,
-};
-
-/**
- * Custom tag for !reference-all
- */
-const referenceAllTag = {
-  identify: (value: unknown) => value instanceof ReferenceAllNode,
-  tag: "!reference-all",
-  collection: "map" as const,
-  nodeClass: ReferenceAllNode,
-};
-
-/**
- * Custom tag for !merge
- */
-const mergeTag = {
-  identify: (value: unknown) => value instanceof MergeNode,
-  tag: "!merge",
-  collection: "seq" as const,
-  nodeClass: MergeNode,
-};
-
-/**
- * Dummy illegal flag when merge is used on a mapping.
- */
-const illegalMergeOnMapping = {
-  identify: (value: unknown) => value instanceof Merge,
-  tag: "!merge",
-  collection: "map" as const,
-  resolve: (_: unknown, onError: (message: string) => void) => {
-    return onError("!merge tag cannot be used on a mapping");
-  },
-};
-
-/**
- * Custom tag for !flatten
- */
-const flattenTag = {
-  identify: (value: unknown) => value instanceof FlattenNode,
-  tag: "!flatten",
-  collection: "seq" as const,
-  nodeClass: FlattenNode,
-};
-
-/**
- * Dummy illegal flag when flatten is used on a mapping.
- */
-const illegalFlattenOnMapping = {
-  identify: (value: unknown) => value instanceof Flatten,
-  tag: "!flatten",
-  collection: "map" as const,
-  resolve: (_: unknown, onError: (message: string) => void) => {
-    return onError("!flatten tag cannot be used on a mapping");
-  },
-};
-
 // Custom tags array for parsing
 const customTags: Tags = [
-  referenceTag,
-  referenceAllTag,
-  flattenTag,
-  illegalFlattenOnMapping,
-  mergeTag,
-  illegalMergeOnMapping,
+  ...referenceTags,
+  ...ReferenceAllTags,
+  ...FlattenTags,
+  ...MergeTags,
 ];
 
 export interface ParseOptions {

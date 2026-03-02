@@ -105,3 +105,41 @@ export class ReferenceNode extends YAMLMap {
     return value;
   }
 }
+
+/**
+ * Custom tag for !reference
+ */
+const referenceTag = {
+  identify: (value: unknown) => value instanceof ReferenceNode,
+  tag: "!reference",
+  collection: "map" as const,
+  nodeClass: ReferenceNode,
+};
+
+/**
+ * Dummy illegal flag when !reference is used on a sequence.
+ */
+const illegalReferenceOnSequence = {
+  identify: (value: unknown) => value instanceof ReferenceNode,
+  tag: "!reference",
+  collection: "seq" as const,
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!reference tag cannot be used on a sequence");
+  },
+};
+
+/**
+ * Dummy illegal flag when !reference is used on a scalar.
+ */
+const illegalReferenceOnScalar = {
+  tag: "!reference",
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!reference tag cannot be used on a scalar");
+  },
+};
+
+export const referenceTags = [
+  referenceTag,
+  illegalReferenceOnSequence,
+  illegalReferenceOnScalar,
+];
