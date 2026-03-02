@@ -741,7 +741,7 @@ describe("Resolver", () => {
       );
     });
 
-    it("should throw error when reference-all finds no files", async () => {
+    it("should return empty array when reference-all finds no files", async () => {
       const mainYaml = `
         empty: !reference-all
           glob: empty/*.yaml
@@ -749,9 +749,9 @@ describe("Resolver", () => {
 
       const mainPath = await createTestYamlFile(tempDir, "main.yaml", mainYaml);
 
-      await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
-        /No YAML files found matching glob pattern/,
-      );
+      const result = await loadYamlWithReferences(mainPath);
+
+      expect(result).toEqual({ empty: [] });
     });
 
     it("should handle invalid YAML in referenced file", async () => {

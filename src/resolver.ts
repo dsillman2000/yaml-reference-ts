@@ -511,6 +511,10 @@ async function resolveReferenceAll(
     });
   }
 
+  if (filteredFiles.length === 0) {
+    return [];
+  }
+
   // Sort files alphabetically for consistent ordering
   filteredFiles.sort();
 
@@ -602,9 +606,7 @@ function resolveReferenceAllSync(
   }
 
   if (filteredFiles.length === 0) {
-    throw new Error(
-      `No YAML files found matching glob pattern: ${globPattern} (from ${refAll.location})`,
-    );
+    return [];
   }
 
   // Sort files alphabetically for consistent ordering
