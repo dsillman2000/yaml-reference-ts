@@ -26,7 +26,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint -c eslint.config.mjs",
     "prepublishOnly": "npm run build",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "check-specs": "./scripts/update-spec-badge.sh"
   },
   "keywords": [
     "yaml",
