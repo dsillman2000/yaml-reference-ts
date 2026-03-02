@@ -27,19 +27,21 @@ files: !reference-all {glob: ./data/*.yaml}
 - **Tag Name**: `!reference`
 - **Class**: `Reference`
 - **Properties**:
-  - `_location` (string): Absolute path to the YAML file where this `!reference` tag was found. This is automatically set by the library during parsing based on the file being processed.
+  - `location` (string): Absolute path to the YAML file where this `!reference` tag was found. This is automatically set by the library during parsing based on the file being processed.
   - `path` (string): Relative path to another YAML file. Required, explicitly provided by the user in the YAML document.
-- **Behavior**: When the YAML parser encounters `!reference`, it should instantiate a `Reference` object with the provided path.
-- **Resolution**: The resolution engine should resolve the YAML content of the reference relative to the file containing the `!reference` tag.
+  - `anchor` (string, optional): Name of a YAML anchor (`&name`) defined in the target file. When provided, only the value attached to that anchor is extracted instead of the entire document. An error is raised if the anchor does not exist in the target file.
+- **Behavior**: When the YAML parser encounters `!reference`, it should instantiate a `Reference` object with the provided path and optional anchor.
+- **Resolution**: The resolution engine should resolve the YAML content of the reference relative to the file containing the `!reference` tag. If `anchor` is specified, the engine extracts the anchored value from the parsed AST (after resolving aliases and tags like `!merge`) rather than returning the whole document.
 
 #### 1.2 `!reference-all` Tag  
 - **Tag Name**: `!reference-all`
 - **Class**: `ReferenceAll`
 - **Properties**:
-  - `_location` (string): Absolute path to the YAML file where this `!reference-all` tag was found. This is automatically set by the library during parsing based on the file being processed.
+  - `location` (string): Absolute path to the YAML file where this `!reference-all` tag was found. This is automatically set by the library during parsing based on the file being processed.
   - `glob` (string): Glob pattern to match YAML files. Required, explicitly provided by the user in the YAML document.
-- **Behavior**: When the YAML parser encounters `!reference-all`, it should instantiate a `ReferenceAll` object with the provided glob pattern.
-- **Resolution**: The resolution engine should resolve the YAML content of all references found in the files matched by the glob pattern relative to the file containing the `!reference-all` tag. Files are resolved in deterministic alphabetical order.
+  - `anchor` (string, optional): Name of a YAML anchor (`&name`) defined in each matched file. When provided, only the value attached to that anchor is extracted from each file instead of the entire document. An error is raised if the anchor does not exist in any matched file.
+- **Behavior**: When the YAML parser encounters `!reference-all`, it should instantiate a `ReferenceAll` object with the provided glob pattern and optional anchor.
+- **Resolution**: The resolution engine should resolve the YAML content of all references found in the files matched by the glob pattern relative to the file containing the `!reference-all` tag. If `anchor` is specified, the engine extracts the anchored value from each file. Files are resolved in deterministic alphabetical order.
 
 #### 1.3 Implementation Details
 - Both classes should be exported from the library
@@ -79,8 +81,8 @@ files: !reference-all {glob: ./data/*.yaml}
    # Inline mapping syntax
    config: !reference {path: ./config/database.yaml}
    ```
-2. The `_location` property is automatically set to the absolute path of the file containing this `Reference` object during parsing.
-3. Read and parse the referenced YAML file relative to the `_location` property.
+2. The `location` property is automatically set to the absolute path of the file containing this `Reference` object during parsing.
+3. Read and parse the referenced YAML file relative to the `location` property.
 4. Recursively resolve any references within that file using the referenced file's directory as the base path
 5. Replace the `Reference` object with the resolved content
 
@@ -94,8 +96,8 @@ files: !reference-all {glob: ./data/*.yaml}
    # Inline mapping syntax
    configs: !reference-all {glob: ./configs/*.yaml}
    ```
-2. The `_location` property is automatically set to the absolute path of the file containing this `ReferenceAll` object during parsing.
-3. Evaluate glob pattern relative to the `_location` property.
+2. The `location` property is automatically set to the absolute path of the file containing this `ReferenceAll` object during parsing.
+3. Evaluate glob pattern relative to the `location` property.
 4. For each matching YAML file:
    - Read and parse the file
    - Recursively resolve any references within that file using the file's directory as the base path
@@ -225,13 +227,15 @@ export async function loadAndResolve(filePath: string): Promise<any>;
 #### 7.2 Type Definitions
 ```typescript
 interface Reference {
-  _location: string;
+  location: string;
   path: string;
+  anchor?: string;
 }
 
 interface ReferenceAll {
-  _location: string;
+  location: string;
   glob: string;
+  anchor?: string;
 }
 
 type YamlContent = any; // Could be refined based on use cases
@@ -256,8 +260,8 @@ type YamlContent = any; // Could be refined based on use cases
 ### 9. Acceptance Criteria
 
 1. ✅ Library can parse YAML with `!reference` and `!reference-all` tags using mapping syntax only
-2. ✅ `_recursivelyResolveReferences` correctly resolves nested references with proper `_location` tracking
-3. ✅ `_loadReferences` correctly handles custom tags to produce objects containing `Reference` + `ReferenceAll` instances with `_location` set
+2. ✅ `_recursivelyResolveReferences` correctly resolves nested references with proper `location` tracking
+3. ✅ `_loadReferences` correctly handles custom tags to produce objects containing `Reference` + `ReferenceAll` instances with `location` set
 4. ✅ CLI reads from given file path and writes JSON to stdout with sorted keys and 2-space indentation
 5. ✅ Error cases are handled with descriptive messages
 6. ✅ Unit tests cover all specified scenarios

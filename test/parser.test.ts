@@ -65,7 +65,7 @@ describe("YAML Parser", () => {
 
         expect(result.database).toBeInstanceOf(Reference);
         expect(result.database.path).toBe("./config/database.yaml");
-        expect(result.database._location).toBe(filePath);
+        expect(result.database.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -90,7 +90,7 @@ describe("YAML Parser", () => {
 
         expect(result.settings).toBeInstanceOf(Reference);
         expect(result.settings.path).toBe("./settings/production.yaml");
-        expect(result.settings._location).toBe(filePath);
+        expect(result.settings.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -116,7 +116,7 @@ describe("YAML Parser", () => {
 
         expect(result.configs).toBeInstanceOf(ReferenceAll);
         expect(result.configs.glob).toBe("./configs/*.yaml");
-        expect(result.configs._location).toBe(filePath);
+        expect(result.configs.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -141,7 +141,7 @@ describe("YAML Parser", () => {
 
         expect(result.files).toBeInstanceOf(ReferenceAll);
         expect(result.files.glob).toBe("./data/*.yaml");
-        expect(result.files._location).toBe(filePath);
+        expect(result.files.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -173,10 +173,10 @@ describe("YAML Parser", () => {
         expect(result.app.name).toBe("myapp");
         expect(result.app.config).toBeInstanceOf(Reference);
         expect(result.app.config.path).toBe("./app/config.yaml");
-        expect(result.app.config._location).toBe(filePath);
+        expect(result.app.config.location).toBe(filePath);
         expect(result.app.data.files).toBeInstanceOf(ReferenceAll);
         expect(result.app.data.files.glob).toBe("./data/*.yaml");
-        expect(result.app.data.files._location).toBe(filePath);
+        expect(result.app.data.files.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -206,10 +206,10 @@ describe("YAML Parser", () => {
         expect(Array.isArray(result.configs)).toBe(true);
         expect(result.configs[0]).toBeInstanceOf(Reference);
         expect(result.configs[0].path).toBe("./config1.yaml");
-        expect(result.configs[0]._location).toBe(filePath);
+        expect(result.configs[0].location).toBe(filePath);
         expect(result.configs[1]).toBeInstanceOf(Reference);
         expect(result.configs[1].path).toBe("./config2.yaml");
-        expect(result.configs[1]._location).toBe(filePath);
+        expect(result.configs[1].location).toBe(filePath);
         expect(result.configs[2]).toEqual({ name: "regular" });
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -354,6 +354,153 @@ describe("YAML Parser", () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     });
+
+    it("should extract a scalar anchor value with extractAnchor option", async () => {
+      const yaml = `
+name: &name David
+age: &age 25
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath, {
+          extractAnchor: "name",
+        });
+        expect(result).toBe("David");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should extract a mapping anchor value with extractAnchor option", async () => {
+      const yaml = `
+config: &cfg
+  host: localhost
+  port: 5432
+other: value
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath, {
+          extractAnchor: "cfg",
+        });
+        expect(result).toEqual({ host: "localhost", port: 5432 });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should throw when extractAnchor names a non-existent anchor", async () => {
+      const yaml = `
+name: &name David
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        await expect(
+          parseYamlWithReferences(filePath, { extractAnchor: "missing" }),
+        ).rejects.toThrow(/missing/);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should return the whole document when extractAnchor is omitted", async () => {
+      const yaml = `
+name: &name David
+age: &age 25
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+        expect(result).toEqual({ name: "David", age: 25 });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should extract a deeply nested anchor", async () => {
+      const yaml = `
+level1:
+  level2:
+    level3:
+      secret: &deep 42
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath, {
+          extractAnchor: "deep",
+        });
+        expect(result).toBe(42);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should resolve aliases within the extracted anchor subtree", async () => {
+      const yaml = `
+base: &base
+  x: 10
+composite: &comp
+  imported: *base
+  y: 20
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath, {
+          extractAnchor: "comp",
+        });
+        expect(result).toEqual({ imported: { x: 10 }, y: 20 });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("parseYamlWithReferencesSync", () => {
@@ -409,7 +556,7 @@ describe("YAML Parser", () => {
 
         expect(result.database).toBeInstanceOf(Reference);
         expect(result.database.path).toBe("./config/database.yaml");
-        expect(result.database._location).toBe(filePath);
+        expect(result.database.location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -526,12 +673,12 @@ describe("YAML Parser", () => {
         // First item should be a Reference
         expect(result.data.sequence[0]).toBeInstanceOf(Reference);
         expect(result.data.sequence[0].path).toBe("./config1.yaml");
-        expect(result.data.sequence[0]._location).toBe(filePath);
+        expect(result.data.sequence[0].location).toBe(filePath);
 
         // Second item should be a Reference
         expect(result.data.sequence[1]).toBeInstanceOf(Reference);
         expect(result.data.sequence[1].path).toBe("./config2.yaml");
-        expect(result.data.sequence[1]._location).toBe(filePath);
+        expect(result.data.sequence[1].location).toBe(filePath);
 
         // Third item should be a regular string
         expect(result.data.sequence[2]).toBe("regular");
@@ -566,7 +713,7 @@ describe("YAML Parser", () => {
         // First item should be a ReferenceAll
         expect(result.data.sequence[0]).toBeInstanceOf(ReferenceAll);
         expect(result.data.sequence[0].glob).toBe("./configs/*.yaml");
-        expect(result.data.sequence[0]._location).toBe(filePath);
+        expect(result.data.sequence[0].location).toBe(filePath);
 
         // Second item should be a regular string
         expect(result.data.sequence[1]).toBe("regular");
@@ -606,13 +753,13 @@ describe("YAML Parser", () => {
 
         expect(result.data.sequence[1]).toBeInstanceOf(Reference);
         expect(result.data.sequence[1].path).toBe("./config.yaml");
-        expect(result.data.sequence[1]._location).toBe(filePath);
+        expect(result.data.sequence[1].location).toBe(filePath);
 
         expect(result.data.sequence[2]).toEqual([2, 3]);
 
         expect(result.data.sequence[3]).toBeInstanceOf(ReferenceAll);
         expect(result.data.sequence[3].glob).toBe("./data/*.yaml");
-        expect(result.data.sequence[3]._location).toBe(filePath);
+        expect(result.data.sequence[3].location).toBe(filePath);
 
         expect(result.data.sequence[4]).toBe(4);
       } finally {
@@ -743,7 +890,7 @@ describe("YAML Parser", () => {
 
         expect(result.data.sequence[0]).toBeInstanceOf(Reference);
         expect(result.data.sequence[0].path).toBe("./defaults.yaml");
-        expect(result.data.sequence[0]._location).toBe(filePath);
+        expect(result.data.sequence[0].location).toBe(filePath);
 
         expect(result.data.sequence[1]).toEqual({ override: true });
       } finally {
@@ -777,7 +924,7 @@ describe("YAML Parser", () => {
 
         expect(result.data.sequence[1]).toBeInstanceOf(ReferenceAll);
         expect(result.data.sequence[1].glob).toBe("./overrides/*.yaml");
-        expect(result.data.sequence[1]._location).toBe(filePath);
+        expect(result.data.sequence[1].location).toBe(filePath);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
@@ -940,96 +1087,77 @@ data:
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     });
+
+    it("should extract a scalar anchor value with extractAnchor option (sync)", () => {
+      const yaml = `
+name: &name David
+age: &age 25
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = parseYamlWithReferencesSync(filePath, {
+          extractAnchor: "name",
+        });
+        expect(result).toBe("David");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should extract a mapping anchor value with extractAnchor option (sync)", () => {
+      const yaml = `
+config: &cfg
+  host: localhost
+  port: 5432
+other: value
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = parseYamlWithReferencesSync(filePath, {
+          extractAnchor: "cfg",
+        });
+        expect(result).toEqual({ host: "localhost", port: 5432 });
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should throw when extractAnchor names a non-existent anchor (sync)", () => {
+      const yaml = `
+name: &name David
+`;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        expect(() =>
+          parseYamlWithReferencesSync(filePath, { extractAnchor: "missing" }),
+        ).toThrow(/missing/);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
-
-  // describe("parseYamlWithReferencesSync", () => {
-  //     it("should parse YAML without custom tags", () => {
-  //         const yaml = `
-  //     name: test
-  //     version: 1.0.0
-  //     nested:
-  //       key: value
-  //   `;
-
-  //         // Create a temporary file with the YAML content
-  //         const fs = require("fs");
-  //         const path = require("path");
-  //         const tempDir = fs.mkdtempSync(
-  //             path.join(require("os").tmpdir(), "yaml-test-"),
-  //         );
-  //         const filePath = path.join(tempDir, "test.yaml");
-  //         fs.writeFileSync(filePath, yaml);
-
-  //         try {
-  //             const result = parseYamlWithReferencesSync(filePath);
-
-  //             expect(result).toEqual({
-  //                 name: "test",
-  //                 version: "1.0.0",
-  //                 nested: {
-  //                     key: "value",
-  //                 },
-  //             });
-  //         } finally {
-  //             fs.rmSync(tempDir, { recursive: true, force: true });
-  //         }
-  //     });
-
-  //     it("should parse !reference tag with block mapping syntax", () => {
-  //         const yaml = `
-  //     database: !reference
-  //       path: ./config/database.yaml
-  //   `;
-
-  //         // Create a temporary file with the YAML content
-  //         const fs = require("fs");
-  //         const path = require("path");
-  //         const tempDir = fs.mkdtempSync(
-  //             path.join(require("os").tmpdir(), "yaml-test-"),
-  //         );
-  //         const filePath = path.join(tempDir, "test.yaml");
-  //         fs.writeFileSync(filePath, yaml);
-
-  //         try {
-  //             const result = parseYamlWithReferencesSync(filePath);
-
-  //             expect(result.database).toBeInstanceOf(Reference);
-  //             expect(result.database.path).toBe("./config/database.yaml");
-  //             expect(result.database._location).toBe(filePath);
-  //         } finally {
-  //             fs.rmSync(tempDir, { recursive: true, force: true });
-  //         }
-  //     });
-
-  //     it("should throw error for !reference without path property", () => {
-  //         const yaml = `
-  //     invalid: !reference
-  //       not_path: ./something.yaml
-  //   `;
-
-  //         // Create a temporary file with the YAML content
-  //         const fs = require("fs");
-  //         const path = require("path");
-  //         const tempDir = fs.mkdtempSync(
-  //             path.join(require("os").tmpdir(), "yaml-test-"),
-  //         );
-  //         const filePath = path.join(tempDir, "test.yaml");
-  //         fs.writeFileSync(filePath, yaml);
-
-  //         try {
-  //             expect(() => {
-  //                 parseYamlWithReferencesSync(filePath);
-  //             }).toThrow('!reference tag requires a "path" property');
-  //         } finally {
-  //             fs.rmSync(tempDir, { recursive: true, force: true });
-  //         }
-  //     });
-
-  //     it("should throw error when file does not exist", () => {
-  //         expect(() => {
-  //             parseYamlWithReferencesSync("/nonexistent/file.yaml");
-  //         }).toThrow(
-  //             /ENOENT|no such file or directory|Failed to parse YAML file/,
-  //         );
-  //     });
 });

@@ -11,7 +11,15 @@ export class ReferenceAll {
    * Absolute path to the YAML file where this !reference-all tag was found
    * This is automatically set by the library during parsing
    */
-  _location: string;
+  location: string;
+
+  /**
+   * Anchor to import from the referenced YAML file
+   * Optional, provided by the user in the YAML document
+   * If not provided, the entire YAML file will be imported
+   * If provided, only the specified anchor will be imported from the referenced file
+   */
+  anchor?: string;
 
   /**
    * Glob pattern to match YAML files
@@ -22,9 +30,10 @@ export class ReferenceAll {
   /**
    * Creates a new ReferenceAll instance
    * @param glob - Glob pattern to match YAML files
-   * @param location - Absolute path to the file containing this reference (optional, will be set later)
+   * @param options.location - Absolute path to the file containing this reference (optional, will be set later)
+   * @param options.anchor - Anchor to import from the referenced YAML file (optional)
    */
-  constructor(glob: string, location?: string) {
+  constructor(glob: string, options?: { location?: string; anchor?: string }) {
     // Ensure glob is not empty
     if (!glob || glob.length === 0) {
       throw new Error("ReferenceAll glob must not be empty");
@@ -38,14 +47,15 @@ export class ReferenceAll {
     }
 
     this.glob = glob;
-    this._location = location || "";
+    this.location = options?.location || "";
+    this.anchor = options?.anchor ?? undefined;
   }
 
   /**
    * Returns a string representation of the ReferenceAll
    */
   toString(): string {
-    return `ReferenceAll { glob: "${this.glob}", _location: "${this._location}" }`;
+    return `ReferenceAll { glob: "${this.glob}", location: "${this.location}", anchor: "${this.anchor}" }`;
   }
 
   /**
@@ -81,6 +91,18 @@ export class ReferenceAllNode extends YAMLMap {
 
     if (typeof globValue !== "string") {
       throw new Error('!reference-all "glob" property must be a string');
+    }
+
+    // Coerce anchor to string if present (e.g. anchor: 1 is valid YAML
+    // but parsed as a number)
+    if ("anchor" in value && value.anchor !== undefined) {
+      if (typeof value.anchor === "object") {
+        throw new Error(
+          '!reference-all "anchor" property must be a scalar value',
+        );
+      }
+      const anchorVal = value.anchor as string | number | boolean;
+      value.anchor = String(anchorVal);
     }
 
     Object.assign(value, { [REFERENCE_ALL_NODE_FLAG]: true });

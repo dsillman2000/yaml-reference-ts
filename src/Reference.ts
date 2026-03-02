@@ -11,7 +11,15 @@ export class Reference {
    * Absolute path to the YAML file where this !reference tag was found
    * This is automatically set by the library during parsing
    */
-  _location: string;
+  location: string;
+
+  /**
+   * Anchor to import from the referenced YAML file
+   * Optional, provided by the user in the YAML document
+   * If not provided, the entire YAML file will be imported
+   * If provided, only the specified anchor will be imported from the referenced file
+   */
+  anchor?: string;
 
   /**
    * Relative path to another YAML file
@@ -22,9 +30,10 @@ export class Reference {
   /**
    * Creates a new Reference instance
    * @param path - Relative path to another YAML file
-   * @param location - Absolute path to the file containing this reference (optional, will be set later)
+   * @param options.location - Absolute path to the file containing this reference (optional, will be set later)
+   * @param options.anchor - Anchor to import from the referenced YAML file (optional)
    */
-  constructor(path: string, location?: string) {
+  constructor(path: string, options?: { location?: string; anchor?: string }) {
     // Ensure path is not empty
     if (!path || path.length === 0) {
       throw new Error("Reference path must not be empty");
@@ -38,14 +47,15 @@ export class Reference {
     }
 
     this.path = path;
-    this._location = location || "";
+    this.location = options?.location || "";
+    this.anchor = options?.anchor ?? undefined;
   }
 
   /**
    * Returns a string representation of the Reference
    */
   toString(): string {
-    return `Reference { path: "${this.path}", _location: "${this._location}" }`;
+    return `Reference { path: "${this.path}", location: "${this.location}", anchor: "${this.anchor}" }`;
   }
 
   /**
@@ -79,6 +89,16 @@ export class ReferenceNode extends YAMLMap {
 
     if (typeof pathValue !== "string") {
       throw new Error('!reference "path" property must be a string');
+    }
+
+    // Coerce anchor to string if present (e.g. anchor: 1 is valid YAML
+    // but parsed as a number)
+    if ("anchor" in value && value.anchor !== undefined) {
+      if (typeof value.anchor === "object") {
+        throw new Error('!reference "anchor" property must be a scalar value');
+      }
+      const anchorVal = value.anchor as string | number | boolean;
+      value.anchor = String(anchorVal);
     }
 
     Object.assign(value, { [REFERENCE_NODE_FLAG]: true });
