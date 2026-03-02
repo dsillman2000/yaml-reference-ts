@@ -109,3 +109,41 @@ export class ReferenceAllNode extends YAMLMap {
     return value;
   }
 }
+
+/**
+ * Custom tag for !reference
+ */
+const referenceAllTag = {
+  identify: (value: unknown) => value instanceof ReferenceAllNode,
+  tag: "!reference-all",
+  collection: "map" as const,
+  nodeClass: ReferenceAllNode,
+};
+
+/**
+ * Dummy illegal flag when !reference-all is used on a sequence.
+ */
+const illegalReferenceAllOnSequence = {
+  identify: (value: unknown) => value instanceof ReferenceAllNode,
+  tag: "!reference-all",
+  collection: "seq" as const,
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!reference-all tag cannot be used on a sequence");
+  },
+};
+
+/**
+ * Dummy illegal flag when !reference-all is used on a scalar.
+ */
+const illegalReferenceAllOnScalar = {
+  tag: "!reference-all",
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!reference-all tag cannot be used on a scalar");
+  },
+};
+
+export const ReferenceAllTags = [
+  referenceAllTag,
+  illegalReferenceAllOnSequence,
+  illegalReferenceAllOnScalar,
+];

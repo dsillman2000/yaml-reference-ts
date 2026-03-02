@@ -50,3 +50,41 @@ export class FlattenNode extends YAMLSeq {
     return data;
   }
 }
+
+/**
+ * Custom tag for !flatten
+ */
+const flattenTag = {
+  identify: (value: unknown) => value instanceof FlattenNode,
+  tag: "!flatten",
+  collection: "seq" as const,
+  nodeClass: FlattenNode,
+};
+
+/**
+ * Dummy illegal flag when flatten is used on a mapping.
+ */
+const illegalFlattenOnMapping = {
+  identify: (value: unknown) => value instanceof Flatten,
+  tag: "!flatten",
+  collection: "map" as const,
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!flatten tag cannot be used on a mapping");
+  },
+};
+
+/**
+ * Dummy illegal flag when flatten is used on a scalar.
+ */
+const illegalFlattenOnScalar = {
+  tag: "!flatten",
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!flatten tag cannot be used on a scalar");
+  },
+};
+
+export const FlattenTags = [
+  flattenTag,
+  illegalFlattenOnMapping,
+  illegalFlattenOnScalar,
+];

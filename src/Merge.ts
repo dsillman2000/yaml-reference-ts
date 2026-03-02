@@ -51,3 +51,41 @@ export class MergeNode extends YAMLSeq {
     return data;
   }
 }
+
+/**
+ * Custom tag for !merge
+ */
+const mergeTag = {
+  identify: (value: unknown) => value instanceof MergeNode,
+  tag: "!merge",
+  collection: "seq" as const,
+  nodeClass: MergeNode,
+};
+
+/**
+ * Dummy illegal flag when merge is used on a mapping.
+ */
+const illegalMergeOnMapping = {
+  identify: (value: unknown) => value instanceof Merge,
+  tag: "!merge",
+  collection: "map" as const,
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!merge tag cannot be used on a mapping");
+  },
+};
+
+/**
+ * Dummy illegal flag when merge is used on a scalar.
+ */
+const illegalMergeOnScalar = {
+  tag: "!merge",
+  resolve: (_: unknown, onError: (message: string) => void) => {
+    return onError("!merge tag cannot be used on a scalar");
+  },
+};
+
+export const MergeTags = [
+  mergeTag,
+  illegalMergeOnMapping,
+  illegalMergeOnScalar,
+];
