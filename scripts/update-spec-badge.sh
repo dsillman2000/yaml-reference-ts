@@ -6,6 +6,7 @@ color="red"
 YAML_REFERENCE_CLI_EXECUTABLE=$(pwd)/dist/cli/index.js go run github.com/dsillman2000/yaml-reference-specs@${version}
 if [ $? -eq 0 ]; then
     status="passing"
+    color="green"
 fi
 fmtversion=$(echo ${version} | sed 's/-/--/g')
 echo "Spec test compliance status:"
