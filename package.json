@@ -27,7 +27,7 @@
     "lint": "eslint -c eslint.config.mjs",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build",
-    "check-specs": "./scripts/update-spec-badge.sh"
+    "check-specs": "npm run build && ./scripts/update-spec-badge.sh"
   },
   "keywords": [
     "yaml",

@@ -1,5 +1,5 @@
 # YAML Reference Resolver (TypeScript)
-![NPM Version](https://img.shields.io/npm/v/%40dsillman2000%2Fyaml-reference-ts) ![Spec Status](https://img.shields.io/badge/spec%20v0.2.6--3-failing-red?link=https%3A%2F%2Fgithub.com%2Fdsillman2000%2Fyaml-reference-specs%2Ftree%2Fv0.2.6-3)
+![NPM Version](https://img.shields.io/npm/v/%40dsillman2000%2Fyaml-reference-ts) ![Spec Status](https://img.shields.io/badge/spec%20v0.2.6--5-passing-red?link=https%3A%2F%2Fgithub.com%2Fdsillman2000%2Fyaml-reference-specs%2Ftree%2Fv0.2.6-5)
 
 
 
