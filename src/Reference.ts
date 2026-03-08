@@ -143,23 +143,3 @@ export const referenceTags = [
   illegalReferenceOnSequence,
   illegalReferenceOnScalar,
 ];
-
-// Allow the shorthand scalar form: `key: !reference some/path.yaml`
-const referenceScalarShorthand = {
-  tag: "!reference",
-  resolve: (value: unknown) => {
-    if (typeof value !== "string") {
-      throw new Error("!reference scalar shorthand requires a string path");
-    }
-    const obj: Record<string, unknown> = { path: value };
-    Object.assign(obj, { [REFERENCE_NODE_FLAG]: true });
-    return obj;
-  },
-};
-
-// Replace the scalar-illegal entry with the scalar-shorthand handler
-referenceTags.splice(
-  referenceTags.indexOf(illegalReferenceOnScalar),
-  1,
-  referenceScalarShorthand,
-);
