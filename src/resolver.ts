@@ -206,6 +206,9 @@ export async function _recursivelyResolveReferences(
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
 ): Promise<unknown> {
+  // !ignore nodes are removed/nullified at parse time; resolver can assume
+  // they are already handled by the parser/post-processing stage.
+
   if (obj instanceof Reference) {
     return await resolveReference(obj, visitedPaths, allowPaths);
   }
@@ -273,6 +276,9 @@ export function _recursivelyResolveReferencesSync(
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
 ): unknown {
+  // !ignore nodes are removed/nullified at parse time; resolver can assume
+  // they are already handled by the parser/post-processing stage.
+
   if (obj instanceof Reference) {
     return resolveReferenceSync(obj, visitedPaths, allowPaths);
   }
