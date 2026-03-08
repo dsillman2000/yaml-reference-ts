@@ -160,15 +160,7 @@ export async function parseYamlWithReferences(
  * @returns The processed object with Reference, ReferenceAll, Flatten, and
  * Merge instances
  */
-type Context = "root" | "mapValue" | "arrayItem";
-
-function processParsedDocument(
-  obj: unknown,
-  filePath: string,
-  _counts?: WeakMap<object, number>,
-  _seenFlagged?: WeakSet<object>,
-  _context: Context = "root",
-): unknown {
+function processParsedDocument(obj: unknown, filePath: string): unknown {
   // Always-drop: if this node is an !ignore marker, erase it from the
   // output unconditionally (return undefined). Anchors defined inside
   // ignored nodes are still discoverable via AST-level extraction.
@@ -211,13 +203,7 @@ function processParsedDocument(
   if (Array.isArray(obj)) {
     const out: unknown[] = [];
     for (const item of obj) {
-      const v = processParsedDocument(
-        item,
-        filePath,
-        undefined,
-        undefined,
-        "arrayItem",
-      );
+      const v = processParsedDocument(item, filePath);
       if (v !== undefined) out.push(v);
     }
     return out;
@@ -226,13 +212,7 @@ function processParsedDocument(
   if (obj && typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      const v = processParsedDocument(
-        value,
-        filePath,
-        undefined,
-        undefined,
-        "mapValue",
-      );
+      const v = processParsedDocument(value, filePath);
       if (v !== undefined) {
         result[key] = v;
       }

@@ -10,7 +10,7 @@ import {
 } from "./test-utils";
 
 describe("!ignore tag suites (combined)", () => {
-  // Original basic behavior tests
+  // Basic behavior
   describe("basic !ignore behavior", () => {
     let tempDir: string;
 
@@ -76,7 +76,7 @@ describe("!ignore tag suites (combined)", () => {
     });
   });
 
-  // Extra cases added earlier
+  // Additional cases
   describe("!ignore additional cases", () => {
     let tempDir: string;
 
@@ -111,7 +111,6 @@ describe("!ignore tag suites (combined)", () => {
       const file = await createTestYamlFile(tempDir, "alias.yaml", content);
 
       const parsed: any = await parseYamlWithReferences(file);
-      // internal should be removed, copy should be present
       expect(parsed.internal).toBeUndefined();
       expect(parsed.copy).toBe(10);
     });
@@ -133,7 +132,6 @@ describe("!ignore tag suites (combined)", () => {
       const res: any = await loadYamlWithReferences(mainPath);
       expect(Array.isArray(res.databases)).toBe(true);
       expect(res.databases).toHaveLength(2);
-      // each item should be an object with host/port
       expect(res.databases[0]).toHaveProperty("host");
       expect(res.databases[0]).toHaveProperty("port");
     });
@@ -148,7 +146,7 @@ describe("!ignore tag suites (combined)", () => {
     });
   });
 
-  // Parser/resolver specific tests added later
+  // Parser & resolver semantics
   describe("!ignore parser and resolver semantics", () => {
     let tempDir: string;
 
@@ -207,7 +205,6 @@ describe("!ignore tag suites (combined)", () => {
     });
 
     it("resolver preserves undefined element for Reference inside arrays when target is ignored", async () => {
-      // create refs directory
       const fs = require("fs");
       const path = require("path");
       const refs = path.join(tempDir, "refs");
@@ -219,7 +216,6 @@ describe("!ignore tag suites (combined)", () => {
 
       const res: any = await loadYamlWithReferences(mainPath);
       expect(Array.isArray(res.items)).toBe(true);
-      // element should be present (undefined)
       expect(res.items.length).toBe(1);
       expect(res.items[0]).toBeUndefined();
     });
