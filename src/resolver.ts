@@ -188,6 +188,9 @@ export function loadAndResolveSync(
   allowPaths?: string[],
 ): unknown {
   const parsed = parseYamlWithReferencesSync(filePath);
+  if (parsed === undefined || parsed === null) {
+    return null;
+  }
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = _recursivelyResolveReferencesSync(
     parsed,

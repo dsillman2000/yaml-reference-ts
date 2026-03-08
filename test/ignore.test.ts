@@ -2,6 +2,7 @@ import {
   parseYamlWithReferences,
   parseYamlWithReferencesSync,
   loadYamlWithReferences,
+  loadYamlWithReferencesSync,
 } from "../src";
 import {
   createTempDir,
@@ -43,6 +44,18 @@ describe("!ignore tag suites (combined)", () => {
       );
 
       const resolved = await loadYamlWithReferences(filePath);
+      expect(resolved).toBeNull();
+    });
+
+    it("loadYamlWithReferencesSync returns null for a top-level !ignore document", async () => {
+      const content = `!ignore {}`;
+      const filePath = await createTestYamlFile(
+        tempDir,
+        "ignored.yaml",
+        content,
+      );
+
+      const resolved = loadYamlWithReferencesSync(filePath);
       expect(resolved).toBeNull();
     });
 
