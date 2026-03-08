@@ -81,35 +81,14 @@ function parseYamlWithReferencesFromString(
 
   const parsed = root.toJS(doc) as unknown;
 
-  // Count object occurrences to detect aliasing (shared references). We use
-  // this to decide whether an !ignore value should be erased (unique
-  // occurrence) or turned into `null` (aliased elsewhere).
-  const counts = new WeakMap<object, number>();
-  const seenFlagged = new WeakSet<object>();
-  (function buildCounts(node: unknown) {
-    if (node && typeof node === "object") {
-      // count occurrences for object identity
-      const existing = counts.get(node) ?? 0;
-      counts.set(node, existing + 1);
-      if (Array.isArray(node)) {
-        for (const item of node) buildCounts(item);
-      } else {
-        for (const v of Object.values(node as Record<string, unknown>)) {
-          buildCounts(v);
-        }
-      }
-    }
-  })(parsed);
+  const processed = processParsedDocument(parsed, filePath);
 
-  const processed = processParsedDocument(
-    parsed,
-    filePath,
-    counts,
-    seenFlagged,
-  );
+  const rootTag = doc.contents.tag;
+  if (rootTag === "!ignore" && options?.extractAnchor === undefined) {
+    return undefined;
+  }
 
-  // If the top-level was erased by !ignore, represent as `null` per spec.
-  return processed === undefined ? null : processed;
+  return processed;
 }
 
 /**
@@ -186,39 +165,14 @@ type Context = "root" | "mapValue" | "arrayItem";
 function processParsedDocument(
   obj: unknown,
   filePath: string,
-  counts?: WeakMap<object, number>,
-  seenFlagged?: WeakSet<object>,
-  context: Context = "root",
+  _counts?: WeakMap<object, number>,
+  _seenFlagged?: WeakSet<object>,
+  _context: Context = "root",
 ): unknown {
-  // If this node is a resolved !ignore marker, decide whether to erase it or
-  // return `null` depending on whether it was aliased elsewhere. We use the
-  // occurrence counts to detect aliasing: a count > 1 implies an alias exists
-  // somewhere else and we must materialize `null` at this location.
+  // Always-drop: if this node is an !ignore marker, erase it from the
+  // output unconditionally (return undefined). Anchors defined inside
+  // ignored nodes are still discoverable via AST-level extraction.
   if (isResolvedIgnoreNode(obj)) {
-    if (obj && typeof obj === "object") {
-      const count = counts?.get(obj) ?? 0;
-      // Unique occurrence -> erase
-      if (count <= 1) return undefined;
-
-      // Aliased occurrences: decide based on context
-      if (context === "root") {
-        return null;
-      }
-      if (context === "mapValue") {
-        // When appearing as a mapping value and aliased elsewhere, produce null
-        return null;
-      }
-      if (context === "arrayItem") {
-        // For array items prefer to erase the first occurrence and null for
-        // subsequent alias occurrences.
-        if (!seenFlagged) return undefined;
-        if (!seenFlagged.has(obj)) {
-          seenFlagged.add(obj);
-          return undefined;
-        }
-        return null;
-      }
-    }
     return undefined;
   }
 
@@ -260,8 +214,8 @@ function processParsedDocument(
       const v = processParsedDocument(
         item,
         filePath,
-        counts,
-        seenFlagged,
+        undefined,
+        undefined,
         "arrayItem",
       );
       if (v !== undefined) out.push(v);
@@ -275,8 +229,8 @@ function processParsedDocument(
       const v = processParsedDocument(
         value,
         filePath,
-        counts,
-        seenFlagged,
+        undefined,
+        undefined,
         "mapValue",
       );
       if (v !== undefined) {
