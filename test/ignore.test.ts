@@ -24,7 +24,11 @@ describe("!ignore tag suites (combined)", () => {
 
     it("parseYamlWithReferences returns undefined for top-level !ignore", async () => {
       const content = `!ignore {}`;
-      const filePath = await createTestYamlFile(tempDir, "ignored.yaml", content);
+      const filePath = await createTestYamlFile(
+        tempDir,
+        "ignored.yaml",
+        content,
+      );
 
       const parsed = await parseYamlWithReferences(filePath);
       expect(parsed).toBeUndefined();
@@ -32,7 +36,11 @@ describe("!ignore tag suites (combined)", () => {
 
     it("loadYamlWithReferences returns null for a top-level !ignore document", async () => {
       const content = `!ignore {}`;
-      const filePath = await createTestYamlFile(tempDir, "ignored.yaml", content);
+      const filePath = await createTestYamlFile(
+        tempDir,
+        "ignored.yaml",
+        content,
+      );
 
       const resolved = await loadYamlWithReferences(filePath);
       expect(resolved).toBeNull();
