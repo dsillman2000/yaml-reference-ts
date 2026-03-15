@@ -4,41 +4,58 @@
  * Cache is scoped to a single resolution operation lifecycle
  */
 
-interface CacheEntry {
-  content: unknown;
-  fileContent?: string; // Store original file content for anchor extraction optimization
-}
-
 /**
- * File cache for memoizing parsed YAML content during a single resolution operation
- * Keys are based on file path and anchor (if any)
+ * File cache for memoizing parsed YAML content during a single resolution operation.
+ * Uses a nested Map keyed first by filePath, then by anchor (undefined = whole file),
+ * to avoid key-collision issues that arise from string concatenation with a separator.
+ * Raw file contents are stored in a separate map so that anchor-specific entries
+ * never overwrite the whole-file parsed result.
  */
 export class FileCache {
-  private cache = new Map<string, CacheEntry>();
+  // Outer key: filePath, inner key: anchor (undefined = whole-file)
+  private parsed = new Map<string, Map<string | undefined, unknown>>();
+  // Stores raw file contents for reuse when only the anchor differs
+  private fileContents = new Map<string, string>();
 
   /**
-   * Generate a cache key string from file path and anchor
+   * Normalize anchor so that empty string and undefined are treated identically.
    */
-  private createCacheKeyString(filePath: string, anchor?: string): string {
-    return `${filePath}|${anchor || ""}`;
+  private normalizeAnchor(anchor?: string): string | undefined {
+    return anchor || undefined;
+  }
+
+  /**
+   * Check if a cache entry exists for the given file path and anchor.
+   * Returns true even when the cached value is undefined (distinguishes a
+   * stored undefined from a cache miss).
+   */
+  has(filePath: string, anchor?: string): boolean {
+    return (
+      this.parsed.get(filePath)?.has(this.normalizeAnchor(anchor)) ?? false
+    );
+  }
+
+  /**
+   * Check if a cache entry exists (async version for API consistency)
+   */
+  hasAsync(filePath: string, anchor?: string): Promise<boolean> {
+    return Promise.resolve(this.has(filePath, anchor));
   }
 
   /**
    * Get cached content if available
    */
   get<T>(filePath: string, anchor?: string): T | undefined {
-    const keyString = this.createCacheKeyString(filePath, anchor);
-    const entry = this.cache.get(keyString);
-    return entry?.content as T | undefined;
+    return this.parsed
+      .get(filePath)
+      ?.get(this.normalizeAnchor(anchor)) as T | undefined;
   }
 
   /**
    * Get cached file content for optimization purposes
    */
   getFileContent(filePath: string): string | undefined {
-    const keyString = this.createCacheKeyString(filePath); // No anchor = whole file
-    const entry = this.cache.get(keyString);
-    return entry?.fileContent;
+    return this.fileContents.get(filePath);
   }
 
   /**
@@ -49,7 +66,11 @@ export class FileCache {
   }
 
   /**
-   * Store content in cache
+   * Store content in cache.
+   * When `anchor` is provided together with `fileContent`, the raw file content
+   * is stored for later reuse, but no whole-file parsed entry is created.
+   * This prevents an anchor-scoped result from being returned when the full
+   * document is requested later.
    */
   set(
     filePath: string,
@@ -57,16 +78,18 @@ export class FileCache {
     anchor?: string,
     fileContent?: string,
   ): void {
-    const keyString = this.createCacheKeyString(filePath, anchor);
-    this.cache.set(keyString, { content, fileContent });
+    const normalizedAnchor = this.normalizeAnchor(anchor);
 
-    // Optimization: If we have an anchor and fileContent, also store whole file for future anchor extraction
-    if (anchor && fileContent) {
-      const wholeFileKey = this.createCacheKeyString(filePath); // No anchor = whole file
-      // Only store if whole file isn't already cached
-      if (!this.cache.has(wholeFileKey)) {
-        this.cache.set(wholeFileKey, { content, fileContent });
-      }
+    if (!this.parsed.has(filePath)) {
+      this.parsed.set(filePath, new Map());
+    }
+    this.parsed.get(filePath)!.set(normalizedAnchor, content);
+
+    // Store raw file content only — never store an anchor-specific parsed
+    // result under the whole-file key, so a later get(filePath) (no anchor)
+    // still yields a cache miss and triggers a fresh full-document parse.
+    if (fileContent !== undefined && !this.fileContents.has(filePath)) {
+      this.fileContents.set(filePath, fileContent);
     }
   }
 
@@ -87,13 +110,18 @@ export class FileCache {
    * Clear all cached entries
    */
   clear(): void {
-    this.cache.clear();
+    this.parsed.clear();
+    this.fileContents.clear();
   }
 
   /**
-   * Get cache size (number of entries)
+   * Get cache size (number of parsed entries)
    */
   size(): number {
-    return this.cache.size;
+    let count = 0;
+    for (const innerMap of this.parsed.values()) {
+      count += innerMap.size;
+    }
+    return count;
   }
 }

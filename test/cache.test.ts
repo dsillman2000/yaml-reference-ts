@@ -112,7 +112,7 @@ describe("FileCache", () => {
       expect(cache.getFileContent(filePath)).toBeUndefined();
     });
 
-    it("should create both anchor and whole file entries when anchor + fileContent provided", () => {
+    it("should store anchor entry only when anchor + fileContent provided", () => {
       const filePath = "/path/to/file.yaml";
       const content = { test: "anchor data" };
       const fileContent = "yaml file content";
@@ -120,14 +120,15 @@ describe("FileCache", () => {
 
       cache.set(filePath, content, anchor, fileContent);
       
-      // Should have 2 entries: anchor-specific and whole file
-      expect(cache.size()).toBe(2);
+      // Should have 1 parsed entry: anchor-specific only
+      expect(cache.size()).toBe(1);
       
-      // Anchor-specific entry
+      // Anchor-specific entry is present
       expect(cache.get(filePath, anchor)).toEqual(content);
       
-      // Whole file entry for optimization
-      expect(cache.get(filePath)).toEqual(content);
+      // Whole-file parsed entry is absent (cache miss), but fileContent is available
+      expect(cache.has(filePath)).toBe(false);
+      expect(cache.get(filePath)).toBeUndefined();
       expect(cache.getFileContent(filePath)).toEqual(fileContent);
     });
 
@@ -165,7 +166,7 @@ describe("FileCache", () => {
       expect(cache.getFileContent(filePath)).toEqual(fileContent);
     });
 
-    it("should create both entries with setAsync when anchor + fileContent provided", async () => {
+    it("should store anchor entry only with setAsync when anchor + fileContent provided", async () => {
       const filePath = "/path/to/async.yaml";
       const content = { test: "async anchor data" };
       const fileContent = "async yaml content";
@@ -173,9 +174,13 @@ describe("FileCache", () => {
 
       await cache.setAsync(filePath, content, anchor, fileContent);
       
-      expect(cache.size()).toBe(2);
+      // Only the anchor-specific parsed entry is stored
+      expect(cache.size()).toBe(1);
       expect(await cache.getAsync(filePath, anchor)).toEqual(content);
-      expect(await cache.getAsync(filePath)).toEqual(content);
+      
+      // Whole-file parsed entry is absent; fileContent is still available
+      expect(await cache.hasAsync(filePath)).toBe(false);
+      expect(await cache.getAsync(filePath)).toBeUndefined();
       expect(cache.getFileContent(filePath)).toEqual(fileContent);
     });
   });
@@ -224,9 +229,9 @@ describe("FileCache", () => {
       cache.set("/file1.yaml", { test: 3 }, "anchor");
       expect(cache.size()).toBe(3);
       
-      // Set with anchor AND fileContent - creates 2 entries (if whole file not exists)
+      // Set with anchor AND fileContent - creates 1 parsed entry (no whole-file parsed entry)
       cache.set("/file3.yaml", { test: 4 }, "anchor", "content");
-      expect(cache.size()).toBe(5); // file3.yaml| and file3.yaml|anchor
+      expect(cache.size()).toBe(4); // file1.yaml|, file2.yaml|, file1.yaml|anchor, file3.yaml|anchor
     });
 
     it("should clear all cached entries including file content", () => {
@@ -270,6 +275,8 @@ describe("FileCache", () => {
     it("should cache undefined values", () => {
       const filePath = "/undefined.yaml";
       cache.set(filePath, undefined);
+      // get() returns undefined for both a hit and a miss, so use has() to distinguish
+      expect(cache.has(filePath)).toBe(true);
       expect(cache.get(filePath)).toBeUndefined();
     });
 
