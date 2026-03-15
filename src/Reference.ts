@@ -134,9 +134,9 @@ const illegalReferenceOnSequence = {
  */
 const referenceScalarShorthand = {
   tag: "!reference",
-  resolve: (value: unknown) => {
+  resolve: (value: unknown, onError: (message: string) => void) => {
     if (typeof value !== "string") {
-      throw new Error("!reference scalar shorthand requires a string path");
+      return onError("!reference scalar shorthand requires a string path");
     }
     const obj: Record<string, unknown> = { path: value };
     Object.assign(obj, { [REFERENCE_NODE_FLAG]: true });

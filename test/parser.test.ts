@@ -147,6 +147,102 @@ describe("YAML Parser", () => {
       }
     });
 
+    it("should parse !reference tag with scalar shorthand syntax", async () => {
+      const yaml = `
+        database: !reference "./config/database.yaml"
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.database).toBeInstanceOf(Reference);
+        expect(result.database.path).toBe("./config/database.yaml");
+        expect(result.database.location).toBe(filePath);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should treat !reference scalar shorthand with numeric literal as a string path", async () => {
+      // YAML scalar tag resolvers always receive string values; numeric literals
+      // are coerced to strings by the parser before reaching the resolve handler.
+      const yaml = `
+        database: !reference "123"
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+        expect(result.database).toBeInstanceOf(Reference);
+        expect(result.database.path).toBe("123");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should parse !reference-all tag with scalar shorthand syntax", async () => {
+      const yaml = `
+        configs: !reference-all "./configs/*.yaml"
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+
+        expect(result.configs).toBeInstanceOf(ReferenceAll);
+        expect(result.configs.glob).toBe("./configs/*.yaml");
+        expect(result.configs.location).toBe(filePath);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should treat !reference-all scalar shorthand with numeric literal as a string glob", async () => {
+      // YAML scalar tag resolvers always receive string values; numeric literals
+      // are coerced to strings by the parser before reaching the resolve handler.
+      const yaml = `
+        configs: !reference-all "123"
+      `;
+
+      const fs = require("fs");
+      const path = require("path");
+      const tempDir = fs.mkdtempSync(
+        path.join(require("os").tmpdir(), "yaml-test-"),
+      );
+      const filePath = path.join(tempDir, "test.yaml");
+      fs.writeFileSync(filePath, yaml);
+
+      try {
+        const result = await parseYamlWithReferences(filePath);
+        expect(result.configs).toBeInstanceOf(ReferenceAll);
+        expect(result.configs.glob).toBe("123");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     it("should handle mixed references in nested structures", async () => {
       const yaml = `
         app:

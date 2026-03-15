@@ -138,9 +138,9 @@ const illegalReferenceAllOnSequence = {
  */
 const referenceAllScalarShorthand = {
   tag: "!reference-all",
-  resolve: (value: unknown) => {
+  resolve: (value: unknown, onError: (message: string) => void) => {
     if (typeof value !== "string") {
-      throw new Error("!reference-all scalar shorthand requires a string glob");
+      return onError("!reference-all scalar shorthand requires a string glob");
     }
     const obj: Record<string, unknown> = { glob: value };
     Object.assign(obj, { [REFERENCE_ALL_NODE_FLAG]: true });
