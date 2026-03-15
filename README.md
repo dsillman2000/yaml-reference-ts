@@ -44,6 +44,9 @@ database: !reference
 # Inline mapping syntax  
 settings: !reference {path: ./settings/production.yaml}
 
+# Scalar shorthand syntax
+config: !reference "./config/database.yaml"
+
 # Extract a specific anchor from the referenced file
 db_host: !reference {path: ./config/database.yaml, anchor: host}
 
@@ -62,6 +65,9 @@ configs: !reference-all
 
 # Inline mapping syntax
 files: !reference-all {glob: ./data/*.yaml}
+
+# Scalar shorthand syntax
+refs: !reference-all "./refs/*.yaml"
 
 # Extract a specific anchor from each matched file
 ports: !reference-all {glob: ./services/*.yaml, anchor: port}
@@ -98,7 +104,7 @@ merged: !merge
   - {override: true}
 ```
 
-**Note**: For `!reference` and `!reference-all` tags, only mapping syntax is supported. Be sure to conform to the API (`!reference {path: <path>, anchor: <anchor>}` or `!reference-all {glob: <glob>, anchor: <anchor>}`, where `anchor` is optional). For `!flatten` and `!merge` tags, only sequence syntax is supported.
+**Note**: For `!reference` and `!reference-all` tags, mapping syntax and scalar shorthand syntax are supported. For mapping syntax, conform to the API (`!reference {path: <path>, anchor: <anchor>}` or `!reference-all {glob: <glob>, anchor: <anchor>}`, where `anchor` is optional). For scalar shorthand, provide the path or glob directly as a string (e.g., `!reference "./config.yaml"` or `!reference-all "./refs/*.yaml"`). Note that `anchor` cannot be specified using scalar shorthand. For `!flatten` and `!merge` tags, only sequence syntax is supported.
 
 **Deterministic Ordering**: The `!reference-all` tag resolves files in alphabetical order to ensure consistent, predictable results across different systems and runs.
 
@@ -317,7 +323,7 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 
 **Deterministic Behavior**: The library ensures predictable output by:
 - Sorting `!reference-all` file matches alphabetically before resolution
-- Rejecting scalar syntax for `!reference` and `!reference-all` tags (only mapping syntax is allowed)
+- Accepting mapping syntax and scalar shorthand syntax for `!reference` and `!reference-all` tags (sequence syntax is not allowed)
 - Rejecting mapping syntax for `!flatten` and `!merge` tags (only sequence syntax is allowed)
 - Using consistent error messages for validation failures
 - Enforcing path restrictions to prevent unauthorized file access
