@@ -12,6 +12,7 @@ import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
 import { Merge } from "./Merge";
 import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
+import { FileCache } from "./cache";
 
 /**
  * Check if childPath is equal to or nested within parentPath,
@@ -164,7 +165,8 @@ export async function loadAndResolve(
   filePath: string,
   allowPaths?: string[],
 ): Promise<unknown> {
-  const parsed = await parseYamlWithReferences(filePath);
+  const cache = new FileCache();
+  const parsed = await parseYamlWithReferences(filePath, { cache });
   if (parsed === undefined || parsed === null) {
     return null;
   }
@@ -173,6 +175,7 @@ export async function loadAndResolve(
     parsed,
     new Set<string>(),
     normalizedAllowPaths,
+    cache,
   );
   return resolveTransformTagsRecursive(resolved);
 }
@@ -187,12 +190,14 @@ export function loadAndResolveSync(
   filePath: string,
   allowPaths?: string[],
 ): unknown {
-  const parsed = parseYamlWithReferencesSync(filePath);
+  const cache = new FileCache();
+  const parsed = parseYamlWithReferencesSync(filePath, { cache });
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
     new Set<string>(),
     normalizedAllowPaths,
+    cache,
   );
   return resolveTransformTagsRecursive(resolved);
 }
@@ -202,19 +207,21 @@ export function loadAndResolveSync(
  * @param obj - Object that may contain Reference or ReferenceAll instances
  * @param visitedPaths - Set of visited file paths to detect circular references
  * @param allowPaths - Optional list of allowed paths for references
+ * @param cache - Optional file cache for memoization
  * @returns Object with all references resolved
  */
 export async function _recursivelyResolveReferences(
   obj: unknown,
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
+  cache?: FileCache,
 ): Promise<unknown> {
   if (obj instanceof Reference) {
-    return await resolveReference(obj, visitedPaths, allowPaths);
+    return await resolveReference(obj, visitedPaths, allowPaths, cache);
   }
 
   if (obj instanceof ReferenceAll) {
-    return await resolveReferenceAll(obj, visitedPaths, allowPaths);
+    return await resolveReferenceAll(obj, visitedPaths, allowPaths, cache);
   }
 
   if (obj instanceof Flatten) {
@@ -222,7 +229,7 @@ export async function _recursivelyResolveReferences(
     const resolvedSequence = [];
     for (const item of obj.sequence) {
       resolvedSequence.push(
-        await _recursivelyResolveReferences(item, visitedPaths, allowPaths),
+        await _recursivelyResolveReferences(item, visitedPaths, allowPaths, cache),
       );
     }
     return new Flatten(resolvedSequence);
@@ -233,7 +240,7 @@ export async function _recursivelyResolveReferences(
     const resolvedSequence = [];
     for (const item of obj.sequence) {
       resolvedSequence.push(
-        await _recursivelyResolveReferences(item, visitedPaths, allowPaths),
+        await _recursivelyResolveReferences(item, visitedPaths, allowPaths, cache),
       );
     }
     return new Merge(resolvedSequence);
@@ -243,7 +250,7 @@ export async function _recursivelyResolveReferences(
     const resolvedArray = [];
     for (const item of obj) {
       resolvedArray.push(
-        await _recursivelyResolveReferences(item, visitedPaths, allowPaths),
+        await _recursivelyResolveReferences(item, visitedPaths, allowPaths, cache),
       );
     }
     return resolvedArray;
@@ -256,6 +263,7 @@ export async function _recursivelyResolveReferences(
         value,
         visitedPaths,
         allowPaths,
+        cache,
       );
     }
     return resolvedObj;
@@ -269,19 +277,21 @@ export async function _recursivelyResolveReferences(
  * @param obj - Object that may contain Reference or ReferenceAll instances
  * @param visitedPaths - Set of visited file paths to detect circular references
  * @param allowPaths - Optional list of allowed paths for references
+ * @param cache - Optional file cache for memoization
  * @returns Object with all references resolved
  */
 export function _recursivelyResolveReferencesSync(
   obj: unknown,
   visitedPaths: Set<string> = new Set(),
   allowPaths?: string[],
+  cache?: FileCache,
 ): unknown {
   if (obj instanceof Reference) {
-    return resolveReferenceSync(obj, visitedPaths, allowPaths);
+    return resolveReferenceSync(obj, visitedPaths, allowPaths, cache);
   }
 
   if (obj instanceof ReferenceAll) {
-    return resolveReferenceAllSync(obj, visitedPaths, allowPaths);
+    return resolveReferenceAllSync(obj, visitedPaths, allowPaths, cache);
   }
 
   if (obj instanceof Flatten) {
@@ -289,7 +299,7 @@ export function _recursivelyResolveReferencesSync(
     const resolvedSequence = [];
     for (const item of obj.sequence) {
       resolvedSequence.push(
-        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths),
+        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths, cache),
       );
     }
     return new Flatten(resolvedSequence);
@@ -300,7 +310,7 @@ export function _recursivelyResolveReferencesSync(
     const resolvedSequence = [];
     for (const item of obj.sequence) {
       resolvedSequence.push(
-        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths),
+        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths, cache),
       );
     }
     return new Merge(resolvedSequence);
@@ -310,7 +320,7 @@ export function _recursivelyResolveReferencesSync(
     const resolvedArray = [];
     for (const item of obj) {
       resolvedArray.push(
-        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths),
+        _recursivelyResolveReferencesSync(item, visitedPaths, allowPaths, cache),
       );
     }
     return resolvedArray;
@@ -323,6 +333,7 @@ export function _recursivelyResolveReferencesSync(
         value,
         visitedPaths,
         allowPaths,
+        cache,
       );
     }
     return resolvedObj;
@@ -336,6 +347,7 @@ export function _recursivelyResolveReferencesSync(
  * @param ref Reference object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
+ * @param cache Optional file cache for memoization
  * @returns Resolved object. Will not contain any references.
  * @throws Error if circular reference is detected, or if a reference cannot be resolved
  */
@@ -343,6 +355,7 @@ async function resolveReference(
   ref: Reference,
   visitedPaths: Set<string>,
   allowPaths?: string[],
+  cache?: FileCache,
 ): Promise<unknown> {
   if (!ref.location) {
     throw new Error(`Reference missing location: ${ref.toString()}`);
@@ -383,12 +396,14 @@ async function resolveReference(
 
   const parsed = await parseYamlWithReferences(realTargetPath, {
     extractAnchor: ref.anchor,
+    cache,
   });
 
   const resolved = await _recursivelyResolveReferences(
     parsed,
     visitedPaths,
     allowPaths,
+    cache,
   );
 
   visitedPaths.delete(realTargetPath);
@@ -401,6 +416,7 @@ async function resolveReference(
  * @param ref Reference object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
+ * @param cache Optional file cache for memoization
  * @returns Resolved object. Will not contain any references.
  * @throws Error if circular reference is detected, or if a reference cannot be resolved
  */
@@ -408,6 +424,7 @@ function resolveReferenceSync(
   ref: Reference,
   visitedPaths: Set<string>,
   allowPaths?: string[],
+  cache?: FileCache,
 ): unknown {
   if (!ref.location) {
     throw new Error(`Reference missing location: ${ref.toString()}`);
@@ -449,12 +466,14 @@ function resolveReferenceSync(
 
   const parsed = parseYamlWithReferencesSync(realTargetPath, {
     extractAnchor: ref.anchor,
+    cache,
   });
 
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
     visitedPaths,
     allowPaths,
+    cache,
   );
 
   visitedPaths.delete(realTargetPath);
@@ -467,6 +486,7 @@ function resolveReferenceSync(
  * @param refAll ReferenceAll object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
+ * @param cache Optional file cache for memoization
  * @returns Resolved array of objects. Will not contain any references.
  * @throws Error if the ReferenceAll object is missing location or if the glob pattern is invalid.
  */
@@ -474,6 +494,7 @@ async function resolveReferenceAll(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
+  cache?: FileCache,
 ): Promise<unknown[]> {
   if (!refAll.location) {
     throw new Error(`ReferenceAll missing location: ${refAll.toString()}`);
@@ -535,11 +556,13 @@ async function resolveReferenceAll(
     try {
       const parsed = await parseYamlWithReferences(filePath, {
         extractAnchor: refAll.anchor,
+        cache,
       });
       const resolved = await _recursivelyResolveReferences(
         parsed,
         visitedPaths,
         allowPaths,
+        cache,
       );
       if (resolved !== undefined) {
         resolvedContents.push(resolved);
@@ -560,6 +583,7 @@ async function resolveReferenceAll(
  * @param refAll ReferenceAll object to resolve
  * @param visitedPaths Set of visited paths to detect circular references
  * @param allowPaths Optional list of allowed paths for references
+ * @param cache Optional file cache for memoization
  * @returns Resolved array of objects. Will not contain any references.
  * @throws Error if the ReferenceAll object is missing location or if the glob pattern is invalid.
  */
@@ -567,6 +591,7 @@ function resolveReferenceAllSync(
   refAll: ReferenceAll,
   visitedPaths: Set<string>,
   allowPaths?: string[],
+  cache?: FileCache,
 ): unknown[] {
   if (!refAll.location) {
     throw new Error(`ReferenceAll missing location: ${refAll.toString()}`);
@@ -630,12 +655,14 @@ function resolveReferenceAllSync(
     try {
       const parsed = parseYamlWithReferencesSync(filePath, {
         extractAnchor: refAll.anchor,
+        cache,
       });
 
       const resolved = _recursivelyResolveReferencesSync(
         parsed,
         visitedPaths,
         allowPaths,
+        cache,
       );
       if (resolved !== undefined) {
         resolvedContents.push(resolved);

@@ -13,6 +13,7 @@ import {
 import { Flatten, isResolvedFlattenNode, FlattenTags } from "./Flatten";
 import { Merge, isResolvedMergeNode, MergeTags } from "./Merge";
 import { isResolvedIgnoreNode, IgnoreTags } from "./Ignore";
+import { FileCache } from "./cache";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
@@ -28,6 +29,7 @@ const customTags: Tags = [
 
 export interface ParseOptions {
   extractAnchor?: string;
+  cache?: FileCache;
 }
 
 function extractAnchorFromDocument(doc: Document.Parsed, anchor: string): Node {
@@ -96,7 +98,7 @@ function parseYamlWithReferencesFromString(
  * @param filePath - Path to the YAML file to be parsed (used for setting
  * location)
  * @param options - Optional parsing options (e.g. extractAnchor to specify an
- * anchor to extract as root)
+ * anchor to extract as root, cache for memoization)
  * @returns Parsed object with Reference and ReferenceAll instances
  */
 export function parseYamlWithReferencesSync(
@@ -105,8 +107,28 @@ export function parseYamlWithReferencesSync(
 ): unknown {
   try {
     const absolutePath = path.resolve(filePath);
+
+    // Check cache first if provided
+    if (options?.cache) {
+      const cached = options.cache.get(absolutePath, options.extractAnchor);
+      if (cached !== undefined) {
+        return cached;
+      }
+    }
+
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, absolutePath, options);
+    const parsed = parseYamlWithReferencesFromString(
+      content,
+      absolutePath,
+      options,
+    );
+
+    // Cache the result if cache is provided
+    if (options?.cache) {
+      options.cache.set(absolutePath, parsed, options.extractAnchor);
+    }
+
+    return parsed;
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -122,7 +144,7 @@ export function parseYamlWithReferencesSync(
  * @param filePath - Path to the YAML file to be parsed (used for setting
  * location)
  * @param options - Optional parsing options (e.g. extractAnchor to specify an
- * anchor to extract as root)
+ * anchor to extract as root, cache for memoization)
  * @returns Parsed object with Reference and ReferenceAll instances
  */
 export async function parseYamlWithReferences(
@@ -131,8 +153,31 @@ export async function parseYamlWithReferences(
 ): Promise<unknown> {
   try {
     const absolutePath = path.resolve(filePath);
+
+    // Check cache first if provided
+    if (options?.cache) {
+      const cached = await options.cache.getAsync(
+        absolutePath,
+        options.extractAnchor,
+      );
+      if (cached !== undefined) {
+        return cached;
+      }
+    }
+
     const content = await fs.readFile(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, absolutePath, options);
+    const parsed = parseYamlWithReferencesFromString(
+      content,
+      absolutePath,
+      options,
+    );
+
+    // Cache the result if cache is provided
+    if (options?.cache) {
+      await options.cache.setAsync(absolutePath, parsed, options.extractAnchor);
+    }
+
+    return parsed;
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
