@@ -4,12 +4,17 @@
  * Cache is scoped to a single resolution operation lifecycle
  */
 
+interface CacheEntry {
+  content: unknown;
+  fileContent?: string; // Store original file content for anchor extraction optimization
+}
+
 /**
  * File cache for memoizing parsed YAML content during a single resolution operation
  * Keys are based on file path and anchor (if any)
  */
 export class FileCache {
-  private cache = new Map<string, unknown>();
+  private cache = new Map<string, CacheEntry>();
 
   /**
    * Generate a cache key string from file path and anchor
@@ -23,7 +28,17 @@ export class FileCache {
    */
   get<T>(filePath: string, anchor?: string): T | undefined {
     const keyString = this.createCacheKeyString(filePath, anchor);
-    return this.cache.get(keyString) as T | undefined;
+    const entry = this.cache.get(keyString);
+    return entry?.content as T | undefined;
+  }
+
+  /**
+   * Get cached file content for optimization purposes
+   */
+  getFileContent(filePath: string): string | undefined {
+    const keyString = this.createCacheKeyString(filePath); // No anchor = whole file
+    const entry = this.cache.get(keyString);
+    return entry?.fileContent;
   }
 
   /**
@@ -36,16 +51,35 @@ export class FileCache {
   /**
    * Store content in cache
    */
-  set(filePath: string, content: unknown, anchor?: string): void {
+  set(
+    filePath: string,
+    content: unknown,
+    anchor?: string,
+    fileContent?: string,
+  ): void {
     const keyString = this.createCacheKeyString(filePath, anchor);
-    this.cache.set(keyString, content);
+    this.cache.set(keyString, { content, fileContent });
+
+    // Optimization: If we have an anchor and fileContent, also store whole file for future anchor extraction
+    if (anchor && fileContent) {
+      const wholeFileKey = this.createCacheKeyString(filePath); // No anchor = whole file
+      // Only store if whole file isn't already cached
+      if (!this.cache.has(wholeFileKey)) {
+        this.cache.set(wholeFileKey, { content, fileContent });
+      }
+    }
   }
 
   /**
    * Store content in cache (async version for API consistency)
    */
-  setAsync(filePath: string, content: unknown, anchor?: string): Promise<void> {
-    this.set(filePath, content, anchor);
+  setAsync(
+    filePath: string,
+    content: unknown,
+    anchor?: string,
+    fileContent?: string,
+  ): Promise<void> {
+    this.set(filePath, content, anchor, fileContent);
     return Promise.resolve();
   }
 

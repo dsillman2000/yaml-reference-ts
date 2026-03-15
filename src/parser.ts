@@ -116,7 +116,14 @@ export function parseYamlWithReferencesSync(
       }
     }
 
-    const content = fsSync.readFileSync(absolutePath, "utf8");
+    // Get file content from cache or disk
+    let content: string;
+    const cachedContent = options?.cache?.getFileContent(absolutePath);
+    if (cachedContent) {
+      content = cachedContent;
+    } else {
+      content = fsSync.readFileSync(absolutePath, "utf8");
+    }
     const parsed = parseYamlWithReferencesFromString(
       content,
       absolutePath,
@@ -125,7 +132,7 @@ export function parseYamlWithReferencesSync(
 
     // Cache the result if cache is provided
     if (options?.cache) {
-      options.cache.set(absolutePath, parsed, options.extractAnchor);
+      options.cache.set(absolutePath, parsed, options.extractAnchor, content);
     }
 
     return parsed;
@@ -165,7 +172,14 @@ export async function parseYamlWithReferences(
       }
     }
 
-    const content = await fs.readFile(absolutePath, "utf8");
+    // Get file content from cache or disk
+    let content: string;
+    const cachedContent = options?.cache?.getFileContent(absolutePath);
+    if (cachedContent) {
+      content = cachedContent;
+    } else {
+      content = await fs.readFile(absolutePath, "utf8");
+    }
     const parsed = parseYamlWithReferencesFromString(
       content,
       absolutePath,
@@ -174,7 +188,12 @@ export async function parseYamlWithReferences(
 
     // Cache the result if cache is provided
     if (options?.cache) {
-      await options.cache.setAsync(absolutePath, parsed, options.extractAnchor);
+      await options.cache.setAsync(
+        absolutePath,
+        parsed,
+        options.extractAnchor,
+        content,
+      );
     }
 
     return parsed;
