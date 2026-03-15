@@ -133,17 +133,23 @@ const illegalReferenceAllOnSequence = {
 };
 
 /**
- * Dummy illegal flag when !reference-all is used on a scalar.
+ * Custom tag for !reference-all when used in scalar shorthand form (e.g.
+ * !reference-all "refs/*.yaml")
  */
-const illegalReferenceAllOnScalar = {
+const referenceAllScalarShorthand = {
   tag: "!reference-all",
-  resolve: (_: unknown, onError: (message: string) => void) => {
-    return onError("!reference-all tag cannot be used on a scalar");
+  resolve: (value: unknown, onError: (message: string) => void) => {
+    if (typeof value !== "string") {
+      return onError("!reference-all scalar shorthand requires a string glob");
+    }
+    const obj: Record<string, unknown> = { glob: value };
+    Object.assign(obj, { [REFERENCE_ALL_NODE_FLAG]: true });
+    return obj;
   },
 };
 
 export const ReferenceAllTags = [
   referenceAllTag,
   illegalReferenceAllOnSequence,
-  illegalReferenceAllOnScalar,
+  referenceAllScalarShorthand,
 ];
