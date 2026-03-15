@@ -6,6 +6,7 @@ export { Reference } from "./Reference";
 export { ReferenceAll } from "./ReferenceAll";
 export { Flatten } from "./Flatten";
 export { Merge } from "./Merge";
+export { FileCache } from "./cache";
 import { loadAndResolve, loadAndResolveSync } from "./resolver";
 export { parseYamlWithReferencesSync, parseYamlWithReferences } from "./parser";
 
