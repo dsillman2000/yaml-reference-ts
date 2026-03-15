@@ -12,6 +12,7 @@ import {
 } from "./ReferenceAll";
 import { Flatten, isResolvedFlattenNode, FlattenTags } from "./Flatten";
 import { Merge, isResolvedMergeNode, MergeTags } from "./Merge";
+import { isResolvedIgnoreNode, IgnoreTags } from "./Ignore";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
@@ -22,6 +23,7 @@ const customTags: Tags = [
   ...ReferenceAllTags,
   ...FlattenTags,
   ...MergeTags,
+  ...IgnoreTags,
 ];
 
 export interface ParseOptions {
@@ -78,7 +80,15 @@ function parseYamlWithReferencesFromString(
   }
 
   const parsed = root.toJS(doc) as unknown;
-  return processParsedDocument(parsed, filePath);
+
+  const processed = processParsedDocument(parsed, filePath);
+
+  const rootTag = doc.contents.tag;
+  if (rootTag === "!ignore" && options?.extractAnchor === undefined) {
+    return undefined;
+  }
+
+  return processed;
 }
 
 /**
@@ -151,6 +161,13 @@ export async function parseYamlWithReferences(
  * Merge instances
  */
 function processParsedDocument(obj: unknown, filePath: string): unknown {
+  // Always-drop: if this node is an !ignore marker, erase it from the
+  // output unconditionally (return undefined). Anchors defined inside
+  // ignored nodes are still discoverable via AST-level extraction.
+  if (isResolvedIgnoreNode(obj)) {
+    return undefined;
+  }
+
   if (isResolvedReferenceNode(obj)) {
     const anchor =
       "anchor" in obj && typeof obj.anchor === "string"
@@ -184,13 +201,21 @@ function processParsedDocument(obj: unknown, filePath: string): unknown {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => processParsedDocument(item, filePath));
+    const out: unknown[] = [];
+    for (const item of obj) {
+      const v = processParsedDocument(item, filePath);
+      if (v !== undefined) out.push(v);
+    }
+    return out;
   }
 
   if (obj && typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = processParsedDocument(value, filePath);
+      const v = processParsedDocument(value, filePath);
+      if (v !== undefined) {
+        result[key] = v;
+      }
     }
     return result;
   }

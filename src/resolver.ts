@@ -165,6 +165,9 @@ export async function loadAndResolve(
   allowPaths?: string[],
 ): Promise<unknown> {
   const parsed = await parseYamlWithReferences(filePath);
+  if (parsed === undefined || parsed === null) {
+    return null;
+  }
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = await _recursivelyResolveReferences(
     parsed,
@@ -185,6 +188,9 @@ export function loadAndResolveSync(
   allowPaths?: string[],
 ): unknown {
   const parsed = parseYamlWithReferencesSync(filePath);
+  if (parsed === undefined || parsed === null) {
+    return null;
+  }
   const normalizedAllowPaths = normalizeAllowPaths(filePath, allowPaths);
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
@@ -533,13 +539,14 @@ async function resolveReferenceAll(
       const parsed = await parseYamlWithReferences(filePath, {
         extractAnchor: refAll.anchor,
       });
-
       const resolved = await _recursivelyResolveReferences(
         parsed,
         visitedPaths,
         allowPaths,
       );
-      resolvedContents.push(resolved);
+      if (resolved !== undefined) {
+        resolvedContents.push(resolved);
+      }
     } catch (error) {
       visitedPaths.delete(filePath);
       throw error;
@@ -633,7 +640,9 @@ function resolveReferenceAllSync(
         visitedPaths,
         allowPaths,
       );
-      resolvedContents.push(resolved);
+      if (resolved !== undefined) {
+        resolvedContents.push(resolved);
+      }
     } catch (error) {
       visitedPaths.delete(filePath);
       throw error;
