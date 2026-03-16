@@ -155,6 +155,70 @@ describe("Resolver", () => {
           data: ["a", "b", ["c", "d"]],
         });
       });
+
+      it("should exclude !ignored items from flattened result", async () => {
+        const mainYaml = `
+          item: !flatten
+            - [1, 2]
+            - !ignore [3, 4]
+            - [5, 6]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          item: [1, 2, 5, 6],
+        });
+      });
+
+      it("should exclude multiple !ignored items from flattened result", async () => {
+        const mainYaml = `
+          item: !flatten
+            - [1, 2]
+            - !ignore [3, 4]
+            - !ignore [5, 6]
+            - [7, 8]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          item: [1, 2, 7, 8],
+        });
+      });
+
+      it("should exclude !ignored scalar from flattened result", async () => {
+        const mainYaml = `
+          item: !flatten
+            - [1, 2]
+            - !ignore 3
+            - [4, 5]
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          item: [1, 2, 4, 5],
+        });
+      });
     });
 
     describe("merge tag", () => {
@@ -573,6 +637,67 @@ describe("Resolver", () => {
         await expect(loadYamlWithReferences(mainPath)).rejects.toThrow(
           /!merge: all items must be objects after flattening/,
         );
+      });
+
+      it("should exclude !ignored object from merge result", async () => {
+        const mainYaml = `
+          result: !merge
+            - { a: 1, b: 2 }
+            - !ignore { b: 999, c: 3 }
+            - { d: 4 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { a: 1, b: 2, d: 4 },
+        });
+      });
+
+      it("should exclude !ignored object at beginning of merge sequence", async () => {
+        const mainYaml = `
+          result: !merge
+            - !ignore { a: 1, b: 2 }
+            - { c: 3, d: 4 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: { c: 3, d: 4 },
+        });
+      });
+
+      it("should return empty object when all merge items are !ignored", async () => {
+        const mainYaml = `
+          result: !merge
+            - !ignore { a: 1 }
+            - !ignore { b: 2 }
+        `;
+
+        const mainPath = await createTestYamlFile(
+          tempDir,
+          "main.yaml",
+          mainYaml,
+        );
+
+        const result = await loadYamlWithReferences(mainPath);
+
+        expect(result).toEqual({
+          result: {},
+        });
       });
     });
 
