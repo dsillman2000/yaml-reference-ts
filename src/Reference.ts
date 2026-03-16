@@ -129,17 +129,23 @@ const illegalReferenceOnSequence = {
 };
 
 /**
- * Dummy illegal flag when !reference is used on a scalar.
+ * Custom tag for !reference when used in scalar shorthand form (e.g. !reference
+ * "path/to/file.yaml")
  */
-const illegalReferenceOnScalar = {
+const referenceScalarShorthand = {
   tag: "!reference",
-  resolve: (_: unknown, onError: (message: string) => void) => {
-    return onError("!reference tag cannot be used on a scalar");
+  resolve: (value: unknown, onError: (message: string) => void) => {
+    if (typeof value !== "string") {
+      return onError("!reference scalar shorthand requires a string path");
+    }
+    const obj: Record<string, unknown> = { path: value };
+    Object.assign(obj, { [REFERENCE_NODE_FLAG]: true });
+    return obj;
   },
 };
 
 export const referenceTags = [
   referenceTag,
   illegalReferenceOnSequence,
-  illegalReferenceOnScalar,
+  referenceScalarShorthand,
 ];
