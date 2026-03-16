@@ -191,12 +191,16 @@ function processParsedDocument(obj: unknown, filePath: string): unknown {
   }
 
   if (isResolvedFlattenNode(obj)) {
-    const processed = obj.map((item) => processParsedDocument(item, filePath));
+    const processed = obj
+      .map((item) => processParsedDocument(item, filePath))
+      .filter((v) => v !== undefined);
     return new Flatten(processed);
   }
 
   if (isResolvedMergeNode(obj)) {
-    const processed = obj.map((item) => processParsedDocument(item, filePath));
+    const processed = obj
+      .map((item) => processParsedDocument(item, filePath))
+      .filter((v) => v !== undefined);
     return new Merge(processed);
   }
 
