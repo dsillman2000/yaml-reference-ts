@@ -128,16 +128,16 @@ async function loadConfig() {
 
 ### API Reference
 
-#### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<any>`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+#### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<unknown>`
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section). A multi-document file resolves to an array of its documents (see Multi-Document Files).
 
-#### `parseYamlWithReferences(filePath: string, options?: ParseOptions): Promise<any>`
+#### `parseYamlWithReferences(filePath: string, options?: ParseOptions): Promise<unknown>`
 Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file. A multi-document file is parsed as an array of its documents (see Multi-Document Files).
 
-#### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+#### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): unknown`
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section). A multi-document file resolves to an array of its documents (see Multi-Document Files).
 
-#### `parseYamlWithReferencesSync(filePath: string, options?: ParseOptions): any`
+#### `parseYamlWithReferencesSync(filePath: string, options?: ParseOptions): unknown`
 Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances synchronously. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file. A multi-document file is parsed as an array of its documents (see Multi-Document Files).
 
 #### `Reference` Class
