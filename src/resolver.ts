@@ -11,7 +11,12 @@ import { Reference } from "./Reference";
 import { ReferenceAll } from "./ReferenceAll";
 import { Flatten } from "./Flatten";
 import { Merge } from "./Merge";
-import { parseYamlWithReferences, parseYamlWithReferencesSync } from "./parser";
+import {
+  parseYamlDocumentsWithReferences,
+  parseYamlDocumentsWithReferencesSync,
+  parseYamlWithReferences,
+  parseYamlWithReferencesSync,
+} from "./parser";
 
 /**
  * Check if childPath is equal to or nested within parentPath,
@@ -384,9 +389,15 @@ async function resolveReference(
 
   visitedPaths.add(realTargetPath);
 
-  const parsed = await parseYamlWithReferences(realTargetPath, {
+  const documents = await parseYamlDocumentsWithReferences(realTargetPath, {
     extractAnchor: ref.anchor,
   });
+  if (documents.length > 1) {
+    throw new Error(
+      `Cannot !reference multi-document file: ${realTargetPath} (from ${ref.location}). Use !reference-all instead.`,
+    );
+  }
+  const parsed = documents.length === 0 ? null : documents[0];
 
   const resolved = await _recursivelyResolveReferences(
     parsed,
@@ -450,9 +461,15 @@ function resolveReferenceSync(
 
   visitedPaths.add(realTargetPath);
 
-  const parsed = parseYamlWithReferencesSync(realTargetPath, {
+  const documents = parseYamlDocumentsWithReferencesSync(realTargetPath, {
     extractAnchor: ref.anchor,
   });
+  if (documents.length > 1) {
+    throw new Error(
+      `Cannot !reference multi-document file: ${realTargetPath} (from ${ref.location}). Use !reference-all instead.`,
+    );
+  }
+  const parsed = documents.length === 0 ? null : documents[0];
 
   const resolved = _recursivelyResolveReferencesSync(
     parsed,
@@ -536,16 +553,19 @@ async function resolveReferenceAll(
     visitedPaths.add(filePath);
 
     try {
-      const parsed = await parseYamlWithReferences(filePath, {
+      const documents = await parseYamlDocumentsWithReferences(filePath, {
         extractAnchor: refAll.anchor,
       });
-      const resolved = await _recursivelyResolveReferences(
-        parsed,
-        visitedPaths,
-        allowPaths,
-      );
-      if (resolved !== undefined) {
-        resolvedContents.push(resolved);
+      // Each document of a multi-document file is a separate element
+      for (const parsed of documents) {
+        const resolved = await _recursivelyResolveReferences(
+          parsed,
+          visitedPaths,
+          allowPaths,
+        );
+        if (resolved !== undefined) {
+          resolvedContents.push(resolved);
+        }
       }
     } catch (error) {
       visitedPaths.delete(filePath);
@@ -631,17 +651,19 @@ function resolveReferenceAllSync(
     visitedPaths.add(filePath);
 
     try {
-      const parsed = parseYamlWithReferencesSync(filePath, {
+      const documents = parseYamlDocumentsWithReferencesSync(filePath, {
         extractAnchor: refAll.anchor,
       });
-
-      const resolved = _recursivelyResolveReferencesSync(
-        parsed,
-        visitedPaths,
-        allowPaths,
-      );
-      if (resolved !== undefined) {
-        resolvedContents.push(resolved);
+      // Each document of a multi-document file is a separate element
+      for (const parsed of documents) {
+        const resolved = _recursivelyResolveReferencesSync(
+          parsed,
+          visitedPaths,
+          allowPaths,
+        );
+        if (resolved !== undefined) {
+          resolvedContents.push(resolved);
+        }
       }
     } catch (error) {
       visitedPaths.delete(filePath);
