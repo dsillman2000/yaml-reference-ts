@@ -1,6 +1,6 @@
 import * as pathModule from "path";
 import { YAMLMap } from "yaml";
-import type { ToJSContext } from "yaml/dist/util";
+import type { ToJSContext } from "yaml/util";
 
 /**
  * Reference class representing a !reference tag in YAML

@@ -1,5 +1,5 @@
 import { YAMLSeq } from "yaml";
-import type { ToJSContext } from "yaml/dist/util";
+import type { ToJSContext } from "yaml/util";
 
 /**
  * Merge class representing a !merge tag in YAML
