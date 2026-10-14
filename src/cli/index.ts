@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable no-console -- CLI should use console for output and errors */
+/* oxlint-disable no-console -- CLI should use console for output and errors */
 
 /**
  * CLI implementation for yaml-reference-ts
