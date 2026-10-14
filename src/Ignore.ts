@@ -1,5 +1,5 @@
 import { YAMLMap, YAMLSeq } from "yaml";
-import type { ToJSContext } from "yaml/dist/util";
+import type { ToJSContext } from "yaml/util";
 import { Tags } from "yaml";
 
 /**

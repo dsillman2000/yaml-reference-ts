@@ -147,6 +147,7 @@ export function parseYamlDocumentsWithReferencesSync(
       `Failed to parse YAML file ${filePath}: ${
         error instanceof Error ? error.message : String(error)
       }`,
+      { cause: error },
     );
   }
 }
@@ -179,6 +180,7 @@ export async function parseYamlDocumentsWithReferences(
       `Failed to parse YAML file ${filePath}: ${
         error instanceof Error ? error.message : String(error)
       }`,
+      { cause: error },
     );
   }
 }
