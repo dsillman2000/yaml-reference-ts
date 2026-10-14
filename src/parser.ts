@@ -3,7 +3,7 @@
  * Uses the eemeli/yaml package to parse YAML with custom tags
  */
 
-import { Document, Node, parseDocument, Tags, visit } from "yaml";
+import { Document, Node, parseAllDocuments, Tags, visit } from "yaml";
 import { isResolvedReferenceNode, Reference, referenceTags } from "./Reference";
 import {
   isResolvedReferenceAllNode,
@@ -61,12 +61,11 @@ function extractAnchorFromDocument(doc: Document.Parsed, anchor: string): Node {
   return anchors.get(anchor)!;
 }
 
-function parseYamlWithReferencesFromString(
-  content: string,
+function parseDocumentWithReferences(
+  doc: Document.Parsed,
   filePath: string,
   options?: ParseOptions,
 ): unknown {
-  const doc = parseDocument(content, { customTags });
   if (doc.errors.length > 0) {
     throw doc.errors[0];
   }
@@ -92,21 +91,56 @@ function parseYamlWithReferencesFromString(
 }
 
 /**
- * Parse YAML content with custom !reference and !reference-all tags
+ * Parse every document in a (possibly multi-document) YAML string. Documents
+ * whose root is tagged !ignore are returned as undefined so that callers can
+ * still tell how many documents the source contained.
+ */
+function parseYamlDocumentsWithReferencesFromString(
+  content: string,
+  filePath: string,
+  options?: ParseOptions,
+): unknown[] {
+  const docs = parseAllDocuments(content, { customTags });
+  return docs.map((doc) => parseDocumentWithReferences(doc, filePath, options));
+}
+
+/**
+ * Collapse a list of parsed documents into a single value: single-document
+ * files yield their document, and multi-document files yield an array of their
+ * non-ignored documents.
+ */
+function collapseDocuments(documents: unknown[]): unknown {
+  if (documents.length === 0) {
+    return null;
+  }
+  if (documents.length === 1) {
+    return documents[0];
+  }
+  return documents.filter((doc) => doc !== undefined);
+}
+
+/**
+ * Parse every document in a YAML file with custom !reference and
+ * !reference-all tags. Documents whose root is tagged !ignore are returned as
+ * undefined.
  * @param filePath - Path to the YAML file to be parsed (used for setting
  * location)
  * @param options - Optional parsing options (e.g. extractAnchor to specify an
- * anchor to extract as root)
- * @returns Parsed object with Reference and ReferenceAll instances
+ * anchor to extract as root of each document)
+ * @returns One parsed value per document in the file
  */
-export function parseYamlWithReferencesSync(
+export function parseYamlDocumentsWithReferencesSync(
   filePath: string,
   options?: ParseOptions,
-): unknown {
+): unknown[] {
   try {
     const absolutePath = path.resolve(filePath);
     const content = fsSync.readFileSync(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, absolutePath, options);
+    return parseYamlDocumentsWithReferencesFromString(
+      content,
+      absolutePath,
+      options,
+    );
   } catch (error) {
     // Re-throw the error with context about which file failed to parse
     throw new Error(
@@ -119,7 +153,61 @@ export function parseYamlWithReferencesSync(
 }
 
 /**
- * Parse YAML content with custom !reference and !reference-all tags (async).
+ * Parse every document in a YAML file with custom !reference and
+ * !reference-all tags (async). Documents whose root is tagged !ignore are
+ * returned as undefined.
+ * @param filePath - Path to the YAML file to be parsed (used for setting
+ * location)
+ * @param options - Optional parsing options (e.g. extractAnchor to specify an
+ * anchor to extract as root of each document)
+ * @returns One parsed value per document in the file
+ */
+export async function parseYamlDocumentsWithReferences(
+  filePath: string,
+  options?: ParseOptions,
+): Promise<unknown[]> {
+  try {
+    const absolutePath = path.resolve(filePath);
+    const content = await fs.readFile(absolutePath, "utf8");
+    return parseYamlDocumentsWithReferencesFromString(
+      content,
+      absolutePath,
+      options,
+    );
+  } catch (error) {
+    // Re-throw the error with context about which file failed to parse
+    throw new Error(
+      `Failed to parse YAML file ${filePath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * Parse YAML content with custom !reference and !reference-all tags. A
+ * multi-document file is parsed as an array of its documents, excluding any
+ * whose root is tagged !ignore.
+ * @param filePath - Path to the YAML file to be parsed (used for setting
+ * location)
+ * @param options - Optional parsing options (e.g. extractAnchor to specify an
+ * anchor to extract as root)
+ * @returns Parsed object with Reference and ReferenceAll instances
+ */
+export function parseYamlWithReferencesSync(
+  filePath: string,
+  options?: ParseOptions,
+): unknown {
+  return collapseDocuments(
+    parseYamlDocumentsWithReferencesSync(filePath, options),
+  );
+}
+
+/**
+ * Parse YAML content with custom !reference and !reference-all tags (async). A
+ * multi-document file is parsed as an array of its documents, excluding any
+ * whose root is tagged !ignore.
  * @param filePath - Path to the YAML file to be parsed (used for setting
  * location)
  * @param options - Optional parsing options (e.g. extractAnchor to specify an
@@ -130,19 +218,9 @@ export async function parseYamlWithReferences(
   filePath: string,
   options?: ParseOptions,
 ): Promise<unknown> {
-  try {
-    const absolutePath = path.resolve(filePath);
-    const content = await fs.readFile(absolutePath, "utf8");
-    return parseYamlWithReferencesFromString(content, absolutePath, options);
-  } catch (error) {
-    // Re-throw the error with context about which file failed to parse
-    throw new Error(
-      `Failed to parse YAML file ${filePath}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      { cause: error },
-    );
-  }
+  return collapseDocuments(
+    await parseYamlDocumentsWithReferences(filePath, options),
+  );
 }
 
 /**
