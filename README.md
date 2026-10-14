@@ -13,6 +13,7 @@ A Node.js TypeScript library for resolving YAML documents containing `!reference
 - **Object Merging**: `!merge` tag for merging sequences of objects with last-write-wins semantics
 - **Circular Reference Detection**: Prevents infinite loops with proper error messages
 - **Glob Pattern Support**: `!reference-all` supports glob patterns for multiple files
+- **Multi-Document Files**: `!reference-all` and root input files support multiple `---`-separated YAML documents
 - **CLI Interface**: Command-line tool for resolving YAML files
 - **TypeScript Support**: Full type definitions included
 
@@ -127,17 +128,17 @@ async function loadConfig() {
 
 ### API Reference
 
-#### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<any>`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+#### `loadYamlWithReferences(filePath: string, allowPaths?: string[]): Promise<unknown>`
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section). A multi-document file resolves to an array of its documents (see Multi-Document Files).
 
-#### `parseYamlWithReferences(filePath: string, options?: ParseOptions): Promise<any>`
-Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file.
+#### `parseYamlWithReferences(filePath: string, options?: ParseOptions): Promise<unknown>`
+Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file. A multi-document file is parsed as an array of its documents (see Multi-Document Files).
 
-#### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): any`
-Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section).
+#### `loadYamlWithReferencesSync(filePath: string, allowPaths?: string[]): unknown`
+Loads a YAML file and resolves all `!reference`, `!reference-all`, `!flatten`, and `!merge` tags, returning the fully resolved object synchronously. The optional `allowPaths` parameter restricts which directories can be referenced (see Path Restrictions section). A multi-document file resolves to an array of its documents (see Multi-Document Files).
 
-#### `parseYamlWithReferencesSync(filePath: string, options?: ParseOptions): any`
-Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances synchronously. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file.
+#### `parseYamlWithReferencesSync(filePath: string, options?: ParseOptions): unknown`
+Parses a YAML file with custom tags, setting `location` on Reference and ReferenceAll instances synchronously. The optional `options.extractAnchor` specifies a YAML anchor name to extract from the document instead of returning the whole file. A multi-document file is parsed as an array of its documents (see Multi-Document Files).
 
 #### `Reference` Class
 Represents a `!reference` tag with properties:
@@ -287,8 +288,9 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 4. The referenced YAML file is read and parsed relative to `location`
 5. The target path is checked against allowed paths (see Path Restrictions)
 6. If `anchor` is specified, only the value attached to that anchor is extracted (after resolving aliases and tags like `!merge` within the target file). An error is raised if the anchor does not exist.
-7. Any references within the resolved content are recursively resolved
-8. The `Reference` object is replaced with the resolved content
+7. An error is raised if the target file contains more than one YAML document (use `!reference-all` instead)
+8. Any references within the resolved content are recursively resolved
+9. The `Reference` object is replaced with the resolved content
 
 ### For `!reference-all` tags:
 1. The `glob` property is parsed from the YAML mapping (must be a relative glob pattern)
@@ -298,7 +300,8 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 5. Matching files are filtered based on allowed paths (see Path Restrictions)
 6. For each matching YAML file:
    - The file is read and parsed
-   - If `anchor` is specified, only the value attached to that anchor is extracted. An error is raised if the anchor does not exist in any matched file.
+   - Each YAML document in the file contributes one element, in document order. Documents whose root is tagged `!ignore` are excluded.
+   - If `anchor` is specified, only the value attached to that anchor is extracted from each document. An error is raised if the anchor does not exist in any matched document.
    - Any references are recursively resolved
 7. The `ReferenceAll` object is replaced with an array of resolved contents
 8. Files are sorted and resolved in deterministic alphabetical order for consistent results across systems
@@ -321,6 +324,27 @@ const resolved = await loadYamlWithReferences('./config/main.yaml', [
 6. The merge is shallow: nested objects are replaced entirely, not deeply merged
 7. The `Merge` object is replaced with the resulting merged object
 
+### Multi-Document Files:
+A YAML file may contain multiple documents separated by `---`. Each document has its own anchors.
+- `!reference` cannot target a multi-document file; use `!reference-all`.
+- `!reference-all` chains every document of every matched file into its result array, ordered by file path and then by document order. Documents whose root is tagged `!ignore` are excluded.
+- A multi-document root input file resolves to an array with one element per document. Documents whose root is tagged `!ignore` are dropped.
+
+```yaml
+# docs.yaml
+!ignore Header, suppressed from output.
+---
+Hello: World
+---
+Goodbye: World
+```
+
+```yaml
+# input.yaml
+refs: !reference-all docs.yaml
+# -> {"refs": [{"Hello": "World"}, {"Goodbye": "World"}]}
+```
+
 **Deterministic Behavior**: The library ensures predictable output by:
 - Sorting `!reference-all` file matches alphabetically before resolution
 - Accepting mapping syntax and scalar shorthand syntax for `!reference` and `!reference-all` tags (sequence syntax is not allowed)
@@ -338,7 +362,8 @@ The library throws descriptive errors for:
 - Missing required properties (`path` for `!reference`, `glob` for `!reference-all`)
 - Absolute paths in `!reference` or `!reference-all` tags (only relative paths are allowed)
 - References to files outside allowed paths
-- Non-existent `anchor` in a referenced file (or in any file matched by `!reference-all`)
+- Non-existent `anchor` in a referenced file (or in any document matched by `!reference-all`)
+- `!reference` to a file containing multiple YAML documents
 - `!flatten` tag applied to non-sequence values
 - `!merge` tag applied to a sequence of values that are not mappings
 
