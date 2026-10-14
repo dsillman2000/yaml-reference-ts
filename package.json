@@ -22,9 +22,9 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:specs": "chmod +x $PWD/dist/cli/index.js && curl -sL https://api.github.com/repos/dsillman2000/yaml-reference-specs/releases/latest | jq -r .tag_name | YAML_REFERENCE_CLI_EXECUTABLE=$PWD/dist/cli/index.js xargs -I {} go run github.com/dsillman2000/yaml-reference-specs@{}",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint -c eslint.config.mjs",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build",
     "check-specs": "npm run build && ./scripts/update-spec-badge.sh"
@@ -43,17 +43,14 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
-    "@typescript-eslint/parser": "^8.71.2",
-    "eslint": "^10.12.0",
     "jest": "^30.5.2",
-    "prettier": "^3.9.10",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "oxlint-tsgolint": "^7.0.2004",
     "ts-jest": "^29.4.14",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "test-exclude": "^8.0.0",

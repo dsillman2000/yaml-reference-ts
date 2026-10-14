@@ -419,10 +419,17 @@ npm run test:coverage
 npm test -- __tests__/parser.test.ts
 ```
 
-### Linting
+### Linting and Formatting
 
 ```bash
+# Lint with oxlint (including type-aware rules via oxlint-tsgolint)
 npm run lint
+
+# Format with oxfmt
+npm run format
+
+# Check formatting without writing
+npm run format:check
 ```
 
 ## Dependencies
@@ -434,7 +441,8 @@ npm run lint
 ### Development
 - TypeScript
 - Jest for testing
-- ESLint for code quality
+- oxlint for code quality
+- oxfmt for formatting
 
 ## Acknowledgments
 
